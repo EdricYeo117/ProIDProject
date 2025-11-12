@@ -39,6 +39,11 @@ async function execute(sql, binds = {}, options = {}) {
   }
 }
 
+async function getConnection() {
+  if (!pool) await initPool();
+  return pool.getConnection();
+}
+
 async function closePool() {
   if (pool) {
     await pool.close(5);
@@ -46,4 +51,4 @@ async function closePool() {
   }
 }
 
-module.exports = { initPool, execute, closePool };
+module.exports = { initPool, execute, closePool, getConnection };

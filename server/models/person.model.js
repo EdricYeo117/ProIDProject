@@ -1,52 +1,31 @@
-const oracledb = require('oracledb');
 const db = require('../services/db.service');
+const oracledb = require('oracledb');
 
-/**
- * Create a person row and return its id + echo of key fields.
- * REQUIRED: category_id, school_id, full_name
- * OPTIONAL: email, graduation_year, profile_image_url, bio, linkedin_url, is_featured, status
- */
-async function createPerson(payload) {
-  const {
-    category_id,
-    school_id,
-    full_name,
-    email = null,
-    graduation_year = null,
-    profile_image_url = null,
-    bio = null,
-    linkedin_url = null,
-    is_featured = 0,
-    status = 'active',
-    created_by = 'api',
-    updated_by = 'api',
-  } = payload;
-
+// Inserts a new person; relies on IDENTITY for person_id
+async function createPerson({
+  full_name, category_id, school_id, bio, profile_image_url, is_featured = 0, status = 'active'
+}) {
   const sql = `
     INSERT INTO persons (
-      category_id, school_id, full_name, email, graduation_year,
-      profile_image_url, bio, linkedin_url, is_featured, status,
-      created_by, updated_by
+      full_name, category_id, school_id, bio, profile_image_url, status, is_featured
     ) VALUES (
-      :category_id, :school_id, :full_name, :email, :graduation_year,
-      :profile_image_url, :bio, :linkedin_url, :is_featured, :status,
-      :created_by, :updated_by
+      :full_name, :category_id, :school_id, :bio, :profile_image_url, :status, :is_featured
     )
-    RETURNING person_id INTO :out_id
+    RETURNING person_id INTO :id
   `;
-
   const binds = {
-    category_id, school_id, full_name, email, graduation_year,
-    profile_image_url, bio, linkedin_url,
-    is_featured: Number(is_featured) ? 1 : 0,
-    status, created_by, updated_by,
-    out_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+    full_name,
+    category_id,
+    school_id,
+    bio,
+    profile_image_url,
+    status,
+    is_featured: is_featured ? 1 : 0,
+    id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
   };
-
   const result = await db.execute(sql, binds, { autoCommit: true });
-  const person_id = result.outBinds.out_id[0];
-
-  return { person_id, full_name, category_id, school_id, profile_image_url, status };
+  const newId = Array.isArray(result.outBinds?.id) ? result.outBinds.id[0] : result.outBinds?.id;
+  return { person_id: Number(newId) };
 }
 
 module.exports = { createPerson };

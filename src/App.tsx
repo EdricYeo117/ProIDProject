@@ -1,20 +1,18 @@
-import React from "react";
-import HallOfFame from "./components/hof/HallOfFame"; // <- fix path (and drop extension)
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import HallOfFame from './components/hof/HallOfFame';
+import NewPerson from './components/admin/NewPerson';
 
-// Super-thin error boundary so runtime errors don't leave a blank page
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err?: Error }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { err: undefined };
-  }
-  static getDerivedStateFromError(err: Error) { return { err }; }
-  componentDidCatch(err: Error, info: any) { console.error("App ErrorBoundary caught:", err, info); }
-  render() {
-    if (this.state.err) {
+  constructor(props:any){ super(props); this.state = { err: undefined }; }
+  static getDerivedStateFromError(err: Error){ return { err }; }
+  componentDidCatch(err: Error, info:any){ console.error('App ErrorBoundary:', err, info); }
+  render(){
+    if (this.state.err){
       return (
-        <div style={{ padding: 16, color: "#b00020", background: "#fff1f2", fontFamily: "system-ui, sans-serif" }}>
-          <h3 style={{ margin: 0 }}>Something went wrong.</h3>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{String(this.state.err?.message || this.state.err)}</pre>
+        <div style={{ padding:16, color:'#b00020', background:'#fff1f2' }}>
+          <h3>Something went wrong.</h3>
+          <pre style={{ whiteSpace:'pre-wrap' }}>{String(this.state.err?.message || this.state.err)}</pre>
         </div>
       );
     }
@@ -22,10 +20,17 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
 }
 
-const App: React.FC = () => (
-  <ErrorBoundary>
-    <HallOfFame />
-  </ErrorBoundary>
-);
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/" element={<HallOfFame />} />
+        <Route path="/admin/new-person" element={<NewPerson />} />
+        {/* fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

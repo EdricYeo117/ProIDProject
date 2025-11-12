@@ -1,82 +1,67 @@
-// server/services/oci.service.js
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const common = require('oci-common');
+const { ConfigFileAuthenticationDetailsProvider } = require('oci-common');
 const objectStorage = require('oci-objectstorage');
-const { v4: uuid } = require('uuid');
+const path = require('path');
 
-const { OCI_REGION, OCI_NAMESPACE, OCI_BUCKET } = process.env;
+const authProvider = new ConfigFileAuthenticationDetailsProvider(
+  process.env.OCI_CONFIG_FILE || path.resolve(process.env.HOME || process.env.USERPROFILE, '.oci', 'config'),
+  process.env.OCI_CONFIG_PROFILE || 'DEFAULT'
+);
 
-let client; // lazy singleton
+const client = new objectStorage.ObjectStorageClient({ authenticationDetailsProvider: authProvider });
+client.regionId = process.env.OCI_REGION;
 
-function expandHome(p) {
-  if (!p) return p;
-  if (p.startsWith('~')) return path.join(os.homedir(), p.slice(1));
-  return p;
+const NAMESPACE = process.env.OCI_NAMESPACE;
+const BUCKET = process.env.OCI_BUCKET;
+
+function expiresIn(minutes) {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + minutes);
+  return d;
+}
+function expiresInDays(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
-function getClient() {
-  if (client) return client;
-
-  // 1) Config-file auth if OCI_CONFIG_FILE exists
-  const cfgPath = expandHome(process.env.OCI_CONFIG_FILE || path.join(os.homedir(), '.oci', 'config'));
-  const profile = process.env.OCI_PROFILE || 'DEFAULT';
-  if (fs.existsSync(cfgPath)) {
-    const provider = new common.ConfigFileAuthenticationDetailsProvider(cfgPath, profile);
-    client = new objectStorage.ObjectStorageClient({ authenticationDetailsProvider: provider });
-    client.regionId = OCI_REGION;
-    return client;
-  }
-
-  // 2) Simple auth via env vars (no config file)
-  const { OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT, OCI_PRIVATE_KEY_PEM, OCI_PRIVATE_KEY_PASSPHRASE } = process.env;
-  if (OCI_TENANCY_OCID && OCI_USER_OCID && OCI_FINGERPRINT && OCI_PRIVATE_KEY_PEM) {
-    const provider = new common.SimpleAuthenticationDetailsProvider(
-      OCI_TENANCY_OCID,
-      OCI_USER_OCID,
-      OCI_FINGERPRINT,
-      OCI_PRIVATE_KEY_PEM,
-      OCI_PRIVATE_KEY_PASSPHRASE || null,
-      OCI_REGION
-    );
-    client = new objectStorage.ObjectStorageClient({ authenticationDetailsProvider: provider });
-    client.regionId = OCI_REGION;
-    return client;
-  }
-
-  // 3) (Optional) Instance principals if you run on OCI compute
-  // const provider = new common.InstancePrincipalsAuthenticationDetailsProvider();
-  // client = new objectStorage.ObjectStorageClient({ authenticationDetailsProvider: provider });
-  // client.regionId = OCI_REGION;
-
-  throw new Error(
-    `OCI auth not configured. Provide either:
-     - OCI_CONFIG_FILE (and ensure it exists), or
-     - OCI_TENANCY_OCID, OCI_USER_OCID, OCI_FINGERPRINT, OCI_PRIVATE_KEY_PEM`
-  );
-}
-
-async function createUploadPar({ prefix = 'persons/' } = {}) {
-  const c = getClient();
-  const objectName = `${prefix}${uuid()}`;
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-  const resp = await c.createPreauthenticatedRequest({
-    namespaceName: OCI_NAMESPACE,
-    bucketName: OCI_BUCKET,
+/**
+ * Create two PARs for a specific object:
+ *  - upload PAR (WRITE, short TTL)
+ *  - view PAR (READ, long TTL)
+ * Returns { uploadUrl, viewUrl, objectName }
+ */
+async function createParsForObject(objectName, contentType = 'application/octet-stream') {
+  // --- WRITE (PUT) PAR
+  const uploadReq = {
+    namespaceName: NAMESPACE,
+    bucketName: BUCKET,
     createPreauthenticatedRequestDetails: {
-      name: `upload-${objectName}`,
+      name: `upload-${objectName}-${Date.now()}`,
       accessType: objectStorage.models.CreatePreauthenticatedRequestDetails.AccessType.ObjectWrite,
-      objectName,
-      timeExpires: expiresAt,
-    },
-  });
+      bucketListingAction: objectStorage.models.CreatePreauthenticatedRequestDetails.BucketListingAction.Deny,
+      timeExpires: expiresIn(Number(process.env.OCI_PAR_UPLOAD_TTL_MIN || 15)),
+      objectName: objectName
+    }
+  };
+  const upload = await client.createPreauthenticatedRequest(uploadReq);
+  const uploadUrl = `https://objectstorage.${process.env.OCI_REGION}.oraclecloud.com${upload.preauthenticatedRequest.accessUri}`;
 
-  const uploadUrl = `https://objectstorage.${OCI_REGION}.oraclecloud.com${resp.preauthenticatedRequest.accessUri}`;
-  const objectUrl = `https://objectstorage.${OCI_REGION}.oraclecloud.com/n/${OCI_NAMESPACE}/b/${OCI_BUCKET}/o/${encodeURIComponent(objectName)}`;
+  // --- READ PAR (long-living view URL)
+  const readReq = {
+    namespaceName: NAMESPACE,
+    bucketName: BUCKET,
+    createPreauthenticatedRequestDetails: {
+      name: `view-${objectName}-${Date.now()}`,
+      accessType: objectStorage.models.CreatePreauthenticatedRequestDetails.AccessType.ObjectRead,
+      bucketListingAction: objectStorage.models.CreatePreauthenticatedRequestDetails.BucketListingAction.Deny,
+      timeExpires: expiresInDays(Number(process.env.OCI_PAR_VIEW_TTL_DAYS || 365)),
+      objectName: objectName
+    }
+  };
+  const read = await client.createPreauthenticatedRequest(readReq);
+  const viewUrl = `https://objectstorage.${process.env.OCI_REGION}.oraclecloud.com${read.preauthenticatedRequest.accessUri}`;
 
-  return { uploadUrl, objectUrl, objectName, expiresAt };
+  return { uploadUrl, viewUrl, objectName, contentType };
 }
 
-module.exports = { createUploadPar };
+module.exports = { createParsForObject };

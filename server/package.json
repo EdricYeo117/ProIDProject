@@ -17,5 +17,9 @@
     "oci-sdk": "^2.121.1",
     "oracledb": "^6.10.0",
     "react-router-dom": "^7.9.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "tailwindcss": "^4.1.17"
   }
 }

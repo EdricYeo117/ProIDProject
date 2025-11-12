@@ -15,7 +15,7 @@ build/
 !.env.sample
 
 # Server envs (in case you keep per-folder)
-/server/.env
+server/.env
 src/.env
 
 # OCI / private keys
@@ -29,9 +29,6 @@ server/keys/**
 *.crt
 *.der
 *.pub
-**/.env
-**/.env.local
-**/.env.*.local
 
 # Local config you don’t want in git
 server/config/*.json

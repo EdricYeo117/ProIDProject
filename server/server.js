@@ -31,6 +31,11 @@ app.use(express.json({ limit: '1mb' }));
 
 // --- Routes ---
 app.use('/api', hofRoutes);
+const uploadRoutes = require('./routes/upload.routes');
+app.use('/api/uploads', uploadRoutes);
+const personRoutes = require('./routes/person.routes');
+app.use('/api/persons', personRoutes);
+
 
 // --- Start ---
 const port = Number(process.env.PORT) || 8080;

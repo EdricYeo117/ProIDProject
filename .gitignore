@@ -1,24 +1,34 @@
-# Logs
-logs
+# Node / Vite
+node_modules/
+dist/
+build/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# VSCode / OS
+.vscode/
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Env files (keep a sample)
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Server envs (in case you keep per-folder)
+server/.env
+src/.env
+
+# OCI / private keys
+server/keys/**
+!server/keys/.gitkeep   # keep folder structure only
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+*.der
+*.pub
+
+# Local config you don’t want in git
+server/config/*.json

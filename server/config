@@ -1,0 +1,6 @@
+[DEFAULT]
+user=ocid1.user.oc1..aaaaaaaaedf2475nktjyxxaxyfrb62v76uirgcvsd5bpzvj2jtqvx22vrroq
+fingerprint=28:e8:45:99:06:31:f9:ad:78:2e:f0:65:75:38:da:f0
+tenancy=ocid1.tenancy.oc1..aaaaaaaadotxrgsc7kyrahhpjju5ec6aw3sf53gn2szqsdyg5d7xiii3mjeq
+region=ap-singapore-1
+key_file=F:\ProIDProject\server\keys\edric.yeo@oracle.com-2025-11-12T09_24_44.950Z.pem

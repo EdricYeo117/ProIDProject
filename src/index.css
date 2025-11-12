@@ -66,3 +66,24 @@ img {
   clip: rect(0, 0, 0, 0);
   border: 0;
 }
+
+/* Hide scrollbars when we want a clean chip tray */
+.no-scrollbar {
+  -ms-overflow-style: none;     /* IE/Edge */
+  scrollbar-width: none;        /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar { /* Chrome/Safari/Opera */
+  width: 0;
+  height: 0;
+}
+
+/* Subtle edge fade to hint “more content” */
+.edge-fade {
+  --fade: 28px;
+  -webkit-mask-image: linear-gradient(to right,
+    transparent, #000 var(--fade),
+    #000 calc(100% - var(--fade)), transparent);
+  mask-image: linear-gradient(to right,
+    transparent, #000 var(--fade),
+    #000 calc(100% - var(--fade)), transparent);
+}

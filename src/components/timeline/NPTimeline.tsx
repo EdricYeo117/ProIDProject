@@ -1,5 +1,5 @@
 // src/components/timeline/NPTimeline.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   Award,
@@ -209,6 +209,9 @@ function EventCard({
 }
 
 /* ─────────────────────────── Main ─────────────────────────── */
+const NAVBAR_OFFSET_PX = 88;
+const ERA_CLEARANCE_PX = 48; // extra space between filters and the first ERA badge
+const ERA_BADGE_OVERHANG_PX = 72; // height of the purple era chip + its margin
 
 export default function NPTimeline() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -216,12 +219,33 @@ export default function NPTimeline() {
     null
   );
   const [isLoading, setIsLoading] = useState(true);
-
-  // Filters
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set()); // empty = ALL
   const [eraFilter, setEraFilter] = useState<Set<string>>(new Set()); // empty = ALL
+  const [eraH, setEraH] = useState(72); // fallback height for the era pill
+  const firstEraRef = useRef<HTMLDivElement | null>(null);
+
+  // ⬇️ MOVE THESE INSIDE THE COMPONENT
+  const trayRef = useRef<HTMLDivElement | null>(null);
+  const [trayH, setTrayH] = useState(0);
 
   useEffect(() => {
+    let alive = true;
+
+    // —— Sticky tray measurement —— //
+    const el = trayRef.current;
+    const update = () => setTrayH(el ? el.offsetHeight : 0);
+
+    let ro: ResizeObserver | null = null;
+    if (el) {
+      update(); // initial
+      if (typeof ResizeObserver !== "undefined") {
+        ro = new ResizeObserver(update);
+        ro.observe(el);
+      }
+      window.addEventListener("resize", update);
+    }
+
+    // —— Data load —— //
     (async () => {
       try {
         const raw = await jsonFetch<any[]>(
@@ -234,14 +258,24 @@ export default function NPTimeline() {
             (a.display_order ?? 0) - (b.display_order ?? 0) ||
             a.id - b.id
         );
+        if (!alive) return;
         setMilestones(data);
+
+        // after chips render, re-measure tray height
+        requestAnimationFrame(update);
       } catch (e) {
         console.error("Failed to load milestones:", e);
-        setMilestones([]);
+        if (alive) setMilestones([]);
       } finally {
-        setIsLoading(false);
+        if (alive) setIsLoading(false);
       }
     })();
+
+    return () => {
+      alive = false;
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   // Unique filters
@@ -279,13 +313,37 @@ export default function NPTimeline() {
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [filtered]);
 
+  useEffect(() => {
+    const el = firstEraRef.current;
+    if (!el) return;
+
+    const measure = () => setEraH(el.offsetHeight + 12); // +12 for its margin gap
+    measure();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(measure);
+      ro.observe(el);
+    }
+    window.addEventListener("resize", measure);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [grouped.length]);
+
   const Icon = selectedMilestone
     ? categoryIcons[selectedMilestone.category ?? ""] || Calendar
     : Calendar;
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div
+        className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white"
+        style={{
+          scrollPaddingTop: NAVBAR_OFFSET_PX + trayH + eraH + ERA_CLEARANCE_PX,
+        }}
+      >
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-blue-200 text-lg">Loading Timeline...</p>
@@ -324,82 +382,99 @@ export default function NPTimeline() {
   let lastEraShown = ""; // updated while rendering rows
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
+    <div
+      className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white"
+      style={{ scrollPaddingTop: NAVBAR_OFFSET_PX + trayH + eraH }}
+    >
       {/* Space for fixed navbar */}
       <div className="pt-32 md:pt-36 px-6 sm:px-12 pb-20">
         <div className="max-w-6xl mx-auto mb-6 rounded-2xl bg-slate-900/70 border border-slate-700/50 shadow-xl backdrop-blur px-5 py-4">
           {/* ── Filters row ───────────────────────────────────────────── */}
-          <div className="md:sticky md:top-[88px] z-30">
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 backdrop-blur-md shadow-lg px-4 sm:px-5 py-2">
-              <div className="flex flex-col gap-3">
-                {/* Category chips (scrollable on small screens) */}
-                <div className="mb-1 text-xs text-blue-300/70">Category:</div>
-                <div className="flex gap-1.5 flex-nowrap overflow-x-auto no-scrollbar edge-fade pr-1">
-                  <Chip
-                    active={categoryFilter.size === 0}
-                    onClick={() => setCategoryFilter(new Set())}
-                  >
-                    All
-                  </Chip>
-                  {allCategories.map((c) => (
+          <div
+            ref={trayRef}
+            className="md:sticky z-40" // was z-20
+            style={{ top: NAVBAR_OFFSET_PX }}
+          >
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/95 backdrop-blur-md shadow-lg px-4 sm:px-5 py-4">
+              <div className="flex flex-col gap-4">
+                {/* Category chips */}
+                <div>
+                  <div className="mb-2 text-xs font-medium text-blue-300/90 uppercase tracking-wider">
+                    Category
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
                     <Chip
-                      key={c}
-                      active={categoryFilter.has(c)}
-                      onClick={() => toggleSet(setCategoryFilter, c)}
+                      active={categoryFilter.size === 0}
+                      onClick={() => setCategoryFilter(new Set())}
                     >
-                      {c}
+                      All
                     </Chip>
-                  ))}
+                    {allCategories.map((c) => (
+                      <Chip
+                        key={c}
+                        active={categoryFilter.has(c)}
+                        onClick={() => toggleSet(setCategoryFilter, c)}
+                      >
+                        {c}
+                      </Chip>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Era chips */}
-                <div className="mt-2 mb-1 text-xs text-blue-300/70">Era:</div>
-                <div className="flex gap-1.5 flex-nowrap overflow-x-auto no-scrollbar edge-fade pr-1">
-                  <Chip
-                    tone="purple"
-                    active={eraFilter.size === 0}
-                    onClick={() => setEraFilter(new Set())}
-                  >
-                    All
-                  </Chip>
-                  {allEras.map((e) => (
+                <div>
+                  <div className="mb-2 text-xs font-medium text-purple-300/90 uppercase tracking-wider">
+                    Era
+                  </div>
+                  <div className="flex gap-2 flex-wrap items-center">
                     <Chip
-                      key={e}
                       tone="purple"
-                      active={eraFilter.has(e)}
-                      onClick={() => toggleSet(setEraFilter, e)}
+                      active={eraFilter.size === 0}
+                      onClick={() => setEraFilter(new Set())}
                     >
-                      {e}
+                      All
                     </Chip>
-                  ))}
+                    {allEras.map((e) => (
+                      <Chip
+                        key={e}
+                        tone="purple"
+                        active={eraFilter.has(e)}
+                        onClick={() => toggleSet(setEraFilter, e)}
+                      >
+                        {e}
+                      </Chip>
+                    ))}
 
-                  {/* Clear button floats to the right when there are active filters */}
-                  {(categoryFilter.size > 0 || eraFilter.size > 0) && (
-                    <div className="ml-auto">
+                    {/* Clear button */}
+                    {(categoryFilter.size > 0 || eraFilter.size > 0) && (
                       <button
                         onClick={() => {
                           setCategoryFilter(new Set());
                           setEraFilter(new Set());
                         }}
-                        className="px-3 py-1.5 rounded-full text-sm border border-slate-600 text-blue-200 hover:border-red-400 hover:text-white hover:bg-red-600/80 transition-colors"
+                        className="ml-auto px-4 py-1.5 rounded-full text-sm font-medium border-2 border-slate-600 text-slate-300 hover:border-red-400 hover:text-white hover:bg-red-600 transition-all"
                         title="Clear all filters"
                       >
-                        Clear
+                        Clear All
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          {/* Spacer so the sticky tray doesn’t overlap the timeline */}
-          <div className="h-[48px] md:h-[64px]" />
 
           {/* ── Timeline ──────────────────────────────────────────────── */}
-          <div className="relative">
-            {/* vertical spine */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2" />
 
+          <div
+            className="relative"
+            style={{ marginTop: trayH + eraH + ERA_CLEARANCE_PX }}
+          >
+            {/* vertical spine */}
+            <div
+              className="absolute left-1/2 top-0 bottom-0 w-[2px] z-0
+                bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2"
+            />
             <div className="space-y-28 md:space-y-32">
               {grouped.map(([year, items], idx) => {
                 const isLeft = idx % 2 === 0;
@@ -439,9 +514,14 @@ export default function NPTimeline() {
                       </div>
 
                       {/* Center: optional era tag (de-duplicated) + dot */}
-                      <div className="relative z-20 flex-shrink-0">
+                      <div className="relative z-0 flex-shrink-0">
+                        {" "}
+                        {/* was z-20 */}
                         {showEra && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12">
+                          <div
+                            ref={idx === 0 ? firstEraRef : undefined}
+                            className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
+                          >
                             <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
                               {era}
                             </div>

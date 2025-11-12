@@ -1,3 +1,4 @@
+// src/components/timeline/NPTimeline.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Calendar, Award, Building2, GraduationCap, Lightbulb, Globe, Leaf, Users,
@@ -63,7 +64,7 @@ function EventCard({
 
   return (
     <div
-      className="bg-slate-800/95 backdrop-blur-lg rounded-2xl px-6 py-5 border border-slate-700/50 shadow-2xl hover:border-blue-500/50 transition-all duration-200"
+      className="bg-slate-800/95 backdrop-blur-lg rounded-2xl px-6 py-5 border border-slate-700/50 shadow-2xl hover:border-blue-500/50 transition-all duration-200 cursor-pointer"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -97,7 +98,6 @@ function EventCard({
 
 export default function NPTimeline() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  // collapsed years (default: show all)
   const [collapsedYears, setCollapsedYears] = useState<Set<number>>(new Set());
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -118,7 +118,6 @@ export default function NPTimeline() {
     })();
   }, []);
 
-  // Only the years that actually have data
   const years = useMemo(
     () => [...new Set(milestones.map((m) => m.year))].sort((a, b) => a - b),
     [milestones],
@@ -161,134 +160,101 @@ export default function NPTimeline() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-b border-slate-700/50 shadow-xl">
-        <div className="px-8 py-6">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Building2 className="w-10 h-10 text-yellow-400" />
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                  NP Timeline
-                </h1>
-                <p className="text-blue-300 text-sm">1963 - 2024 • Six Decades of Excellence</p>
-              </div>
-            </div>
-            <div className="text-sm text-blue-400/60">Click a year dot or label to collapse/expand that year</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main */}
-      <div className="pt-32 px-6 sm:px-12">
+      {/* top spacing for your fixed nav */}
+      <div className="pt-28 md:pt-32 px-6 sm:px-12 pb-20">
         <div className="max-w-6xl mx-auto">
           <div className="relative">
-            {/* central spine */}
+            {/* center spine */}
             <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2" />
 
-            <div className="space-y-32">
+            <div className="space-y-28 md:space-y-32">
               {years.map((year, index) => {
-                const yearMilestones = getMilestonesForYear(year);
+                const items = getMilestonesForYear(year);
                 const isCollapsed = collapsedYears.has(year);
                 const isLeft = index % 2 === 0;
+                const era = (items[0]?.era_name || '').trim();
+                const prevEra = index > 0 ? (getMilestonesForYear(years[index - 1])[0]?.era_name || '').trim() : '';
+                const showEra = !!era && era !== prevEra;
 
                 return (
                   <div key={year} className="relative">
-                    {/* era label on decade start if present */}
-                    {year % 10 === 0 && yearMilestones[0]?.era_name && (
-                      <div className="absolute left-1/2 -translate-x-1/2 -top-12 z-10">
-                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full font-bold text-lg shadow-lg border-2 border-blue-400/50 whitespace-nowrap">
-                          {yearMilestones[0].era_name}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-start justify-center">
                       {/* LEFT column */}
-                      <div className={`w-[44%] ${isLeft ? 'pr-10' : 'invisible'}`}>
+                      <div className={`w-[44%] ${isLeft ? 'pr-12' : 'invisible'}`}>
                         {isLeft && (
                           <>
-                            {!isCollapsed ? (
-                              <>
-                                <button
-                                  className="text-5xl md:text-6xl font-extrabold text-yellow-400 mb-4 hover:text-yellow-300"
-                                  onClick={() => toggleYear(year)}
-                                >
-                                  {year}
-                                </button>
-                                <div className="space-y-3">
-                                  {yearMilestones.map((m) => (
-                                    <EventCard
-                                      key={m.id}
-                                      milestone={m}
-                                      side="left"
-                                      onClick={() => setSelectedMilestone(m)}
-                                    />
-                                  ))}
-                                </div>
-                              </>
-                            ) : (
-                              <button
-                                className="inline-block text-5xl md:text-6xl font-extrabold text-blue-300/40 hover:text-blue-300/90"
-                                onClick={() => toggleYear(year)}
-                              >
-                                {year}
-                              </button>
+                            {/* BIG year label */}
+                            <button
+                              className={`${
+                                isCollapsed ? 'text-blue-300/40 hover:text-blue-300/80' : 'text-yellow-400 hover:text-yellow-300'
+                              } text-[88px] sm:text-[112px] md:text-[144px] lg:text-[176px] leading-none font-black tracking-tight mb-8 drop-shadow-[0_2px_0_rgba(0,0,0,0.25)] transition-colors`}
+                              onClick={() => toggleYear(year)}
+                            >
+                              {year}
+                            </button>
+
+                            {!isCollapsed && (
+                              <div className="space-y-4">
+                                {items.map((m) => (
+                                  <EventCard
+                                    key={m.id}
+                                    milestone={m}
+                                    side="left"
+                                    onClick={() => setSelectedMilestone(m)}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </>
                         )}
                       </div>
 
-                      {/* CENTER dot (no grey empties anymore) */}
-                      <button
-                        className={[
-                          'relative z-20 flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full transition-transform duration-150 transform-gpu',
-                          !isCollapsed
-                            ? 'bg-yellow-400 ring-4 ring-yellow-400/30 scale-110 shadow-xl shadow-yellow-400/50'
-                            : 'bg-blue-400 shadow-lg shadow-blue-400/40',
-                        ].join(' ')}
-                        onClick={() => toggleYear(year)}
-                        aria-label={`Toggle ${year}`}
-                      />
-                      {/* count badge — bigger */}
-                      {yearMilestones.length > 1 && (
-                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none">
-                          <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-blue-600/90 border border-blue-300/40 text-white grid place-items-center text-base md:text-lg font-bold shadow-xl">
-                            {yearMilestones.length}
-                          </div>
-                        </div>
-                      )}
+                      {/* CENTER: era chip anchored to the dot + the dot itself */}
+                      <div className="relative z-20 flex-shrink-0">
+                        {/* perfectly centered ERA label (if present) */}
+{showEra && (
+  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-6 md:mb-7">
+    <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
+      {era}
+    </div>
+  </div>
+)}
+                        <button
+                          className={`w-8 h-8 rounded-full transition-all duration-200 ${
+                            isCollapsed
+                              ? 'bg-blue-400/70 hover:bg-blue-400 shadow-lg shadow-blue-400/40'
+                              : 'bg-yellow-400 ring-4 ring-yellow-400/30 scale-125 shadow-xl shadow-yellow-400/50'
+                          }`}
+                          onClick={() => toggleYear(year)}
+                          aria-label={`Toggle ${year}`}
+                        />
+                      </div>
 
                       {/* RIGHT column */}
-                      <div className={`w-[44%] ${!isLeft ? 'pl-10' : 'invisible'}`}>
+                      <div className={`w-[44%] ${!isLeft ? 'pl-12' : 'invisible'}`}>
                         {!isLeft && (
                           <>
-                            {!isCollapsed ? (
-                              <>
-                                <button
-                                  className="text-5xl md:text-6xl font-extrabold text-yellow-400 mb-4 hover:text-yellow-300"
-                                  onClick={() => toggleYear(year)}
-                                >
-                                  {year}
-                                </button>
-                                <div className="space-y-3">
-                                  {yearMilestones.map((m) => (
-                                    <EventCard
-                                      key={m.id}
-                                      milestone={m}
-                                      side="right"
-                                      onClick={() => setSelectedMilestone(m)}
-                                    />
-                                  ))}
-                                </div>
-                              </>
-                            ) : (
-                              <button
-                                className="inline-block text-5xl md:text-6xl font-extrabold text-blue-300/40 hover:text-blue-300/90"
-                                onClick={() => toggleYear(year)}
-                              >
-                                {year}
-                              </button>
+                            {/* BIG year label */}
+                            <button
+                              className={`${
+                                isCollapsed ? 'text-blue-300/40 hover:text-blue-300/80' : 'text-yellow-400 hover:text-yellow-300'
+                              } text-7xl md:text-8xl font-black tracking-tight mb-6 transition-colors`}
+                              onClick={() => toggleYear(year)}
+                            >
+                              {year}
+                            </button>
+
+                            {!isCollapsed && (
+                              <div className="space-y-4">
+                                {items.map((m) => (
+                                  <EventCard
+                                    key={m.id}
+                                    milestone={m}
+                                    side="right"
+                                    onClick={() => setSelectedMilestone(m)}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </>
                         )}
@@ -299,53 +265,49 @@ export default function NPTimeline() {
               })}
             </div>
           </div>
-
-          <div className="h-32" />
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Detail modal */}
       {selectedMilestone && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8"
           onClick={() => setSelectedMilestone(null)}
         >
           <div
-            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 max-w-2xl w-full shadow-2xl border border-slate-700/50 animate-in zoom-in-95 duration-200"
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 max-w-2xl w-full shadow-2xl border border-slate-700/50"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start gap-6 mb-6">
-              <div
-                className={`p-4 rounded-2xl bg-gradient-to-br ${
-                  categoryColors[selectedMilestone.category ?? ''] || 'from-blue-500 to-indigo-600'
-                } shadow-lg`}
-              >
-                <Icon className="w-10 h-10 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-3xl font-bold text-blue-400">{selectedMilestone.year}</span>
-                  <span
-                    className={`text-xs font-semibold px-3 py-1 rounded-full bg-gradient-to-r ${
-                      categoryColors[selectedMilestone.category ?? ''] || 'from-blue-500 to-indigo-600'
-                    } text-white`}
+            {(() => {
+              const color = categoryColors[selectedMilestone.category ?? ''] || 'from-blue-500 to-indigo-600';
+              const Ico = categoryIcons[selectedMilestone.category ?? ''] || Calendar;
+              return (
+                <>
+                  <div className="flex items-start gap-6 mb-6">
+                    <div className={`p-4 rounded-2xl bg-gradient-to-br ${color} shadow-lg`}>
+                      <Ico className="w-10 h-10 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-3xl font-bold text-blue-400">{selectedMilestone.year}</span>
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full bg-gradient-to-r ${color} text-white`}>
+                          {selectedMilestone.category}
+                        </span>
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">{selectedMilestone.title}</h2>
+                      <p className="text-sm text-blue-400/80 font-medium">{selectedMilestone.era_name}</p>
+                    </div>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed mb-6">{selectedMilestone.description}</p>
+                  <button
+                    onClick={() => setSelectedMilestone(null)}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-lg"
                   >
-                    {selectedMilestone.category}
-                  </span>
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">{selectedMilestone.title}</h2>
-                <p className="text-sm text-blue-400/80 font-medium">{selectedMilestone.era_name}</p>
-              </div>
-            </div>
-
-            <p className="text-slate-300 leading-relaxed mb-6">{selectedMilestone.description}</p>
-
-            <button
-              onClick={() => setSelectedMilestone(null)}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-blue-500/50"
-            >
-              Close
-            </button>
+                    Close
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

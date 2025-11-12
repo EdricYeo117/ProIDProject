@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --np-blue: #003d5c;
   --np-gold: #ffb81c;

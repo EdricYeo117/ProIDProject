@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Users, GraduationCap, Award, Trophy } from "lucide-react";
 import type { School, HofCard, PersonDetails } from "./types";
-import { fetchSchools, fetchHof, fetchPerson } from "./api";
+import { fetchSchools, fetchHof, fetchPerson } from "./HallOfFameAPI";
 import PersonCard from "./PersonCard";
 import "./HallOfFame.css";
 

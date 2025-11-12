@@ -1,10 +1,10 @@
-module.exports = function adminAuth(req, res, next) {
-  const key = req.get('x-admin-key');
-  if (!process.env.ADMIN_KEY) {
-    return res.status(500).json({ error: 'ADMIN_KEY not set on server' });
-  }
-  if (key !== process.env.ADMIN_KEY) {
+// server/middleware/adminAuth.js
+function requireAdmin(req, res, next) {
+  const provided = (req.header('x-admin-key') || '').trim();
+  const expected = (process.env.ADMIN_KEY || '').trim();
+  if (!expected || provided !== expected) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  return next();
-};
+  next();
+}
+module.exports = requireAdmin;

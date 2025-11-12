@@ -3,7 +3,7 @@ const { getConnection } = require('../services/db.service');
 
 // (OPTIONAL) List achievement types by category for your form dropdown
 async function listAchievementTypes(req, res) {
-  const categoryId = req.query.categoryId || null; // 'students' | 'staff' | 'alumni'
+  const categoryId = req.query.categoryId || null;
   const sql = `
     SELECT achievement_type_id, achievement_type_name
     FROM achievement_types
@@ -13,8 +13,12 @@ async function listAchievementTypes(req, res) {
   let conn;
   try {
     conn = await getConnection();
-    const { rows } = await conn.execute(sql, { cat: categoryId });
-    res.json(rows);
+    const result = await conn.execute(
+      sql,
+      { cat: categoryId },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }   // <- important
+    );
+    res.json(result.rows);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list achievement types' });

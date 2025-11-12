@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import HallOfFame from './components/hof/HallOfFame';
 import NewPerson from './components/admin/NewPerson';
+import NPTimeline from './components/timeline/NPTimeline';
+import TopNav from './components/common/TopNav';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err?: Error }> {
   constructor(props:any){ super(props); this.state = { err: undefined }; }
@@ -23,10 +25,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
+      <TopNav />
       <Routes>
         <Route path="/" element={<HallOfFame />} />
+        <Route path="/timeline" element={<NPTimeline />} />
         <Route path="/admin/new-person" element={<NewPerson />} />
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ErrorBoundary>

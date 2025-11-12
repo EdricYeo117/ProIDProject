@@ -8,6 +8,7 @@ const cors = require('cors');
 const { initPool, closePool } = require('./services/db.service');
 const hofRoutes   = require('./routes/hof.routes');   // /api/*
 const adminRoutes = require('./routes/admin.routes'); // /api/admin/*
+const milestonesRoutes = require('./routes/milestones.routes'); 
 
 const app = express();
 
@@ -39,6 +40,8 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api', hofRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/milestones', milestonesRoutes);
+
 
 /* ---------- Static SPA (optional for production) ---------- */
 /* If you build the React app to /dist, serve it below */

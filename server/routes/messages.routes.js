@@ -1,16 +1,20 @@
-// server/routes/messages.routes.js
 const express = require("express");
 const oracledb = require("oracledb");
 const db = require("../services/db.service");
 
-const BOARD_KEY = "NP-MEMORY-WALL-2025";
-
+// factory so we can use io
 module.exports = function createMessagesRouter(io) {
   const router = express.Router();
 
-  // POST /api/messages  -> insert into Oracle, then broadcast via WebSocket
+  // POST /api/messages -> insert into Oracle + emit to that board room
   router.post("/", async (req, res) => {
-    let { x, y, text, author } = req.body;
+    let { boardKey, x, y, text, author } = req.body;
+
+    if (!boardKey || typeof boardKey !== "string") {
+      return res.status(400).json({ error: "boardKey is required" });
+    }
+
+    boardKey = boardKey.trim().toUpperCase();
 
     if (
       typeof x !== "number" ||
@@ -28,18 +32,15 @@ module.exports = function createMessagesRouter(io) {
         : "Anonymous";
 
     try {
-      // get board_id for this BOARD_KEY
-      const boardResult = await db.execute(
+      // find board_id
+      const boardRes = await db.execute(
         `SELECT BOARD_ID FROM CANVAS_BOARD WHERE BOARD_KEY = :board_key`,
-        { board_key: BOARD_KEY }
+        { board_key: boardKey }
       );
-      const boardRows = boardResult.rows || [];
-
+      const boardRows = boardRes.rows || [];
       if (boardRows.length === 0) {
-        console.error("No board found for BOARD_KEY =", BOARD_KEY);
-        return res.status(500).json({ error: "Board configuration missing" });
+        return res.status(400).json({ error: "Board does not exist" });
       }
-
       const boardId = boardRows[0].BOARD_ID;
 
       const sql = `
@@ -78,6 +79,7 @@ module.exports = function createMessagesRouter(io) {
 
       const messageDto = {
         id: String(id),
+        boardKey,
         x,
         y,
         text,
@@ -88,15 +90,13 @@ module.exports = function createMessagesRouter(io) {
             : String(createdAt),
       };
 
-      // broadcast to all connected clients (retrieval via WebSocket)
-      io.emit("canvas:new-message", messageDto);
+      // emit only to that board
+      io.to(boardKey).emit("canvas:new-message", messageDto);
 
       res.status(201).json(messageDto);
     } catch (err) {
       console.error("POST /api/messages error:", err);
-      res
-        .status(500)
-        .json({ error: "Failed to save message", details: err.message });
+      res.status(500).json({ error: "Failed to save message", details: err.message });
     }
   });
 

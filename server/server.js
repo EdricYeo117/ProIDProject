@@ -13,9 +13,10 @@ const { initPool, closePool } = db;
 const hofRoutes = require("./routes/hof.routes");
 const adminRoutes = require("./routes/admin.routes");
 const milestonesRoutes = require("./routes/milestones.routes");
-const createMessagesRouter = require("./routes/messages.routes"); // function(io)
+const createMessagesRouter = require("./routes/messages.routes"); // factory(io)
+const boardsRoutes = require("./routes/boards.routes");
 
-const BOARD_KEY = "NP-MEMORY-WALL-2025";
+const BOARD_FALLBACK = "NP-MEMORY-WALL-2025";
 
 const app = express();
 
@@ -26,14 +27,14 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://localhost:3000",
-  process.env.CLIENT_ORIGIN, // e.g. https://yourdomain.com
+  process.env.CLIENT_ORIGIN,
 ].filter(Boolean);
 
 const whitelist = new Set(allowedOrigins);
 
 const corsOrigin = isProd
   ? (origin, cb) => {
-      if (!origin) return cb(null, true); // Postman/curl
+      if (!origin) return cb(null, true);
       return whitelist.has(origin)
         ? cb(null, true)
         : cb(new Error("CORS blocked"));
@@ -43,12 +44,13 @@ const corsOrigin = isProd
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: "2mb" }));
 
-/* ---------- Basic API routes ---------- */
+/* ---------- Basic API routes (non-socket) ---------- */
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/api", hofRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/milestones", milestonesRoutes);
+app.use("/api/boards", boardsRoutes);
 
 /* ---------- HTTP server + Socket.IO ---------- */
 const port = Number(process.env.PORT) || 8080;
@@ -62,57 +64,79 @@ const io = new Server(server, {
   },
 });
 
-// On socket connection, send existing messages (retrieval via WebSocket)
-io.on("connection", async (socket) => {
+// mount messages routes AFTER io is created
+const messagesRouter = createMessagesRouter(io);
+app.use("/api/messages", messagesRouter);
+
+// WebSocket: handle board join + initial messages
+io.on("connection", (socket) => {
   console.log("Canvas client connected:", socket.id);
 
-  try {
-    const sql = `
-      SELECT
-        m.MESSAGE_ID,
-        m.X_COORD,
-        m.Y_COORD,
-        m.MESSAGE_TEXT,
-        m.AUTHOR_NAME,
-        m.CREATED_AT
-      FROM CANVAS_MESSAGES m
-      JOIN CANVAS_BOARD b
-        ON m.BOARD_ID = b.BOARD_ID
-      WHERE b.BOARD_KEY = :board_key
-      ORDER BY m.CREATED_AT ASC
-    `;
+  socket.on("canvas:join", async ({ boardKey }) => {
+    const key = (boardKey || BOARD_FALLBACK).toUpperCase();
+    console.log(`Socket ${socket.id} joining board`, key);
 
-    const result = await db.execute(sql, { board_key: BOARD_KEY });
-    const rows = result.rows || [];
+    try {
+      const boardRes = await db.execute(
+        `SELECT BOARD_ID, BOARD_KEY, TITLE
+           FROM CANVAS_BOARD
+          WHERE BOARD_KEY = :board_key`,
+        { board_key: key }
+      );
+      const boardRows = boardRes.rows || [];
+      if (boardRows.length === 0) {
+        socket.emit("canvas:init-error", { message: "Board not found" });
+        return;
+      }
+      const boardId = boardRows[0].BOARD_ID;
 
-    const messages = rows.map((r) => ({
-      id: String(r.MESSAGE_ID),
-      x: r.X_COORD,
-      y: r.Y_COORD,
-      text: r.MESSAGE_TEXT,
-      author: r.AUTHOR_NAME,
-      createdAt:
-        r.CREATED_AT instanceof Date
-          ? r.CREATED_AT.toISOString()
-          : String(r.CREATED_AT),
-    }));
+      const msgRes = await db.execute(
+        `
+        SELECT
+          MESSAGE_ID,
+          X_COORD,
+          Y_COORD,
+          MESSAGE_TEXT,
+          AUTHOR_NAME,
+          CREATED_AT
+        FROM CANVAS_MESSAGES
+        WHERE BOARD_ID = :board_id
+        ORDER BY CREATED_AT ASC
+      `,
+        { board_id: boardId }
+      );
 
-    // send initial payload only to this socket
-    socket.emit("canvas:init", messages);
-  } catch (err) {
-    console.error("Socket init error:", err);
-    socket.emit("canvas:init-error", { message: "Failed to load messages" });
-  }
+      const rows = msgRes.rows || [];
+      const messages = rows.map((r) => ({
+        id: String(r.MESSAGE_ID),
+        boardKey: key,
+        x: r.X_COORD,
+        y: r.Y_COORD,
+        text: r.MESSAGE_TEXT,
+        author: r.AUTHOR_NAME,
+        createdAt:
+          r.CREATED_AT instanceof Date
+            ? r.CREATED_AT.toISOString()
+            : String(r.CREATED_AT),
+      }));
+
+      // leave other rooms (optional)
+      Object.keys(socket.rooms)
+        .filter((room) => room !== socket.id)
+        .forEach((room) => socket.leave(room));
+
+      socket.join(key);
+      socket.emit("canvas:init", { boardKey: key, messages });
+    } catch (err) {
+      console.error("canvas:join error:", err);
+      socket.emit("canvas:init-error", { message: "Failed to load messages" });
+    }
+  });
 
   socket.on("disconnect", () => {
     console.log("Canvas client disconnected:", socket.id);
   });
 });
-
-/* ---------- Messages HTTP routes (insert only) ---------- */
-// pass io into messages router so it can broadcast new messages
-const messagesRouter = createMessagesRouter(io);
-app.use("/api/messages", messagesRouter);
 
 /* ---------- Static SPA (optional for production) ---------- */
 if (isProd) {

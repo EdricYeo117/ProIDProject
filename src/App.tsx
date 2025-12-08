@@ -4,6 +4,7 @@ import HallOfFame from './components/hof/HallOfFame';
 import NewPerson from './components/admin/NewPerson';
 import NPTimeline from './components/timeline/NPTimeline';
 import TopNav from './components/common/TopNav';
+import CommunityCanvas from "./components/canvas/CommunityCanvas";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err?: Error }> {
   constructor(props:any){ super(props); this.state = { err: undefined }; }
@@ -30,6 +31,7 @@ const App: React.FC = () => {
         <Route path="/" element={<HallOfFame />} />
         <Route path="/timeline" element={<NPTimeline />} />
         <Route path="/admin/new-person" element={<NewPerson />} />
+        <Route path="/community-canvas" element={<CommunityCanvas />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ErrorBoundary>

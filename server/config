@@ -1,6 +1,6 @@
 [DEFAULT]
-user=ocid1.user.oc1..aaaaaaaaedf2475nktjyxxaxyfrb62v76uirgcvsd5bpzvj2jtqvx22vrroq
-fingerprint=28:e8:45:99:06:31:f9:ad:78:2e:f0:65:75:38:da:f0
-tenancy=ocid1.tenancy.oc1..aaaaaaaadotxrgsc7kyrahhpjju5ec6aw3sf53gn2szqsdyg5d7xiii3mjeq
-region=ap-singapore-1
-key_file=F:\ProIDProject\server\keys\edric.yeo@oracle.com-2025-11-12T09_24_44.950Z.pem
+user=ocid1.user.oc1..aaaaaaaautgxc2aka6yjosd2ymblbywyvgdkls3nsy23frp3wehzzg6ez2xa
+fingerprint=f9:ad:03:ab:7f:25:72:3f:3b:63:df:00:3f:21:d7:c9
+tenancy=ocid1.tenancy.oc1..aaaaaaaauz4pvdhi2tg65h5jgf5rspklz2tjfzuc2a5eoy6stmmm7tlrdpla
+region=us-ashburn-1
+key_file=F:\ProIDProject\server\keys\edric.yeo@oracle.com-2025-12-08T08_29_19.849Z.pem

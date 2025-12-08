@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
+type MessageColor = "sky" | "emerald" | "amber" | "violet";
+
 type Message = {
   id: string;
   x: number;
@@ -9,6 +11,7 @@ type Message = {
   author?: string;
   createdAt: string;
   boardKey?: string;
+  color?: MessageColor;
 };
 
 type Board = {
@@ -24,6 +27,27 @@ type Board = {
 
 const WORLD_SIZE = 5000;
 const API_BASE = "http://localhost:8080";
+
+const COLOR_STYLES: Record<MessageColor, string> = {
+  sky: "border-sky-500 shadow-sky-900/40",
+  emerald: "border-emerald-500 shadow-emerald-900/40",
+  amber: "border-amber-400 shadow-amber-900/40",
+  violet: "border-violet-500 shadow-violet-900/40",
+};
+
+const DOT_STYLES: Record<MessageColor, string> = {
+  sky: "bg-sky-400 shadow-sky-500/50",
+  emerald: "bg-emerald-400 shadow-emerald-500/50",
+  amber: "bg-amber-400 shadow-amber-500/50",
+  violet: "bg-violet-400 shadow-violet-500/50",
+};
+
+const COLOR_OPTIONS: { value: MessageColor; label: string }[] = [
+  { value: "sky", label: "Memory" },
+  { value: "emerald", label: "Gratitude" },
+  { value: "amber", label: "Milestone" },
+  { value: "violet", label: "Fun / Random" },
+];
 
 const CommunityCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -56,11 +80,30 @@ const CommunityCanvas: React.FC = () => {
   const [formAuthor, setFormAuthor] = useState("");
   const [formText, setFormText] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const [pendingCoords, setPendingCoords] =
-    useState<{ x: number; y: number } | null>(null);
+  const [pendingCoords, setPendingCoords] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [formColor, setFormColor] = useState<MessageColor>("sky");
 
   /* ---------- Load boards ---------- */
+  // center the world initially
+useEffect(() => {
+  if (!containerRef.current) return;
+
+  const rect = containerRef.current.getBoundingClientRect();
+  const initialScale = scale; // 0.2 by default
+  const worldPxWidth = WORLD_SIZE * initialScale;
+  const worldPxHeight = WORLD_SIZE * initialScale;
+
+  setOffset({
+    x: (rect.width - worldPxWidth) / 2,
+    y: (rect.height - worldPxHeight) / 2,
+  });
+}, []); // run once
+
+// load boards list
   useEffect(() => {
     const loadBoards = async () => {
       setBoardsLoading(true);
@@ -205,6 +248,7 @@ const CommunityCanvas: React.FC = () => {
     setPendingCoords(world);
     setFormAuthor("");
     setFormText("");
+    setFormColor("sky"); // default each time
     setFormError(null);
     setFormOpen(true);
   };
@@ -232,6 +276,7 @@ const CommunityCanvas: React.FC = () => {
       y: pendingCoords.y,
       text: formText.trim(),
       author: formAuthor.trim() || "Anonymous",
+      color: formColor,
     };
 
     try {
@@ -322,9 +367,7 @@ const CommunityCanvas: React.FC = () => {
           <select
             className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-slate-100"
             value={selectedBoardKey ?? ""}
-            onChange={(e) =>
-              setSelectedBoardKey(e.target.value || null)
-            }
+            onChange={(e) => setSelectedBoardKey(e.target.value || null)}
             disabled={boardsLoading || boards.length === 0}
           >
             {boards.map((b) => (
@@ -347,68 +390,103 @@ const CommunityCanvas: React.FC = () => {
             New board
           </button>
           {boardsError && (
-            <span className="text-[0.7rem] text-red-400">
-              {boardsError}
-            </span>
+            <span className="text-[0.7rem] text-red-400">{boardsError}</span>
           )}
         </div>
 
         <div>Zoom: {(scale * 100).toFixed(0)}%</div>
-        {loading && (
-          <div className="text-slate-400">Loading messages…</div>
-        )}
+        {loading && <div className="text-slate-400">Loading messages…</div>}
         <div className="ml-auto text-xs text-slate-400">
           Scroll to zoom • drag to pan • double-click anywhere to leave a note
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-hidden bg-slate-800 cursor-grab active:cursor-grabbing"
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        onDoubleClick={handleDoubleClick}
-      >
-        <div
-          className="relative bg-slate-900"
-          style={{
-            width: WORLD_SIZE,
-            height: WORLD_SIZE,
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-            transformOrigin: "0 0",
-            backgroundImage:
-              "radial-gradient(circle, rgba(148,163,184,0.25) 1px, transparent 0)",
-            backgroundSize: "40px 40px",
-            border: "1px solid rgba(148,163,184,0.5)",
-          }}
-        >
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className="absolute"
-              style={{
-                left: m.x,
-                top: m.y,
-              }}
-            >
-              <div className="w-3 h-3 rounded-full bg-sky-400 shadow-md shadow-sky-500/50" />
-              {showFullText && (
-                <div className="mt-1 max-w-xs rounded-xl bg-slate-900/95 border border-sky-500/60 px-3 py-2 text-xs text-slate-100 shadow-lg">
-                  <div className="font-semibold text-[0.7rem] text-sky-300">
-                    {m.author ?? "Anonymous"}
+{/* canvas area */}
+<div className="flex-1 flex items-center justify-center bg-slate-900">
+  <div
+    ref={containerRef}
+    className="
+      relative
+      w-[min(1400px,96vw)]    /* wider */
+      h-[min(800px,82vh)]     /* taller */
+      rounded-[32px]
+      border-2 border-slate-600/70   /* thicker border */
+      bg-slate-950/80
+      shadow-[0_0_140px_rgba(15,23,42,1)]
+      overflow-hidden
+      cursor-grab active:cursor-grabbing
+    "
+    onWheel={handleWheel}
+    onMouseDown={handleMouseDown}
+    onMouseMove={handleMouseMove}
+    onMouseUp={handleMouseUp}
+    onMouseLeave={handleMouseLeave}
+    onDoubleClick={handleDoubleClick}
+  >
+    <div
+      className="absolute bg-slate-900"
+      style={{
+        width: WORLD_SIZE,
+        height: WORLD_SIZE,
+        transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+        transformOrigin: "0 0",
+        backgroundImage:
+          "radial-gradient(circle, rgba(148,163,184,0.15) 1px, transparent 0)",
+        backgroundSize: "40px 40px",
+      }}
+    >
+          {messages.map((m) => {
+            const color = m.color ?? "sky";
+            return (
+              <div
+                key={m.id}
+                className="absolute group"
+                style={{ left: m.x, top: m.y }}
+              >
+                {/* anchor dot */}
+                <div
+                  className={`w-3 h-3 rounded-full shadow-md group-hover:scale-110 transition-transform ${DOT_STYLES[color]}`}
+                />
+
+                {showFullText && (
+                  <div
+                    className={`
+                      mt-2 max-w-xs rounded-2xl bg-slate-900/95 px-3 py-2 text-xs text-slate-100
+                      shadow-xl backdrop-blur-sm border relative
+                      ${COLOR_STYLES[color]}
+                    `}
+                  >
+                    {/* tail */}
+                    <div className="absolute -top-1 left-3 w-2 h-2 bg-slate-900 border-l border-t border-sky-500/70 rotate-45" />
+
+                    <div className="font-semibold text-[0.75rem] text-sky-300">
+                      {m.author ?? "Anonymous"}
+                    </div>
+                    <div className="mt-1 leading-snug text-[0.78rem]">
+                      {m.text}
+                    </div>
+                    <div className="mt-2 text-[0.65rem] text-slate-400 flex items-center justify-between">
+                      <span>
+                        {new Date(m.createdAt).toLocaleDateString("en-SG", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span>
+                        {new Date(m.createdAt).toLocaleTimeString("en-SG", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
                   </div>
-                  <div>{m.text}</div>
-                  <div className="mt-1 text-[0.65rem] text-slate-400">
-                    {new Date(m.createdAt).toLocaleString()}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </div>
+      </div>
       </div>
 
       {/* Message overlay */}
@@ -419,9 +497,9 @@ const CommunityCanvas: React.FC = () => {
               Leave a note on the Memory Wall
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              This board is a shared space. Add a short, positive message about your memories,
-              experiences, or appreciation. Please keep it respectful and suitable for the NP
-              community.
+              This board is a shared space. Add a short, positive message about
+              your memories, experiences, or appreciation. Please keep it
+              respectful and suitable for the NP community.
             </p>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -454,6 +532,36 @@ const CommunityCanvas: React.FC = () => {
                 </div>
               </div>
 
+              {/* style selector */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-2">
+                  Message style (optional)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_OPTIONS.map((opt) => {
+                    const selected = formColor === opt.value;
+                    const dotClass = DOT_STYLES[opt.value];
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormColor(opt.value)}
+                        className={`flex items-center gap-2 px-2 py-1 rounded-full border text-[0.7rem] ${
+                          selected
+                            ? "border-sky-600 bg-sky-50 text-sky-800"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-sky-300"
+                        }`}
+                      >
+                        <span
+                          className={`w-3 h-3 rounded-full shadow ${dotClass}`}
+                        />
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {formError && (
                 <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                   {formError}
@@ -481,8 +589,9 @@ const CommunityCanvas: React.FC = () => {
 
             <div className="mt-4 border-t border-slate-200 pt-3">
               <p className="text-[0.7rem] text-slate-500">
-                How it works: double-click anywhere on the wall to choose a spot, fill in this form,
-                and your note will appear at that location. Others can zoom and pan to discover it.
+                How it works: double-click anywhere on the wall to choose a
+                spot, pick a style, and your note will appear at that location.
+                Others can zoom and pan to discover it.
               </p>
             </div>
           </div>
@@ -497,7 +606,8 @@ const CommunityCanvas: React.FC = () => {
               Create a new board
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              For example: “NP Memory Wall 2026”, “Open House 2026”, or “Alumni Stories”.
+              For example: “NP Memory Wall 2026”, “Open House 2026”, or “Alumni
+              Stories”.
             </p>
 
             <form className="space-y-3" onSubmit={handleCreateBoardSubmit}>

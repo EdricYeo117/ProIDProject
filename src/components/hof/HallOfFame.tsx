@@ -1,9 +1,9 @@
+// src/components/hof/HallOfFame.tsx
 import React, { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Users, GraduationCap, Award, Trophy } from "lucide-react";
 import type { School, HofCard, PersonDetails } from "./types";
 import { fetchSchools, fetchHof, fetchPerson } from "./HallOfFameAPI";
 import PersonCard from "./PersonCard";
-import "./HallOfFame.css";
 
 const segments = [
   { id: "alumni", name: "Distinguished Alumni", icon: GraduationCap },
@@ -14,11 +14,13 @@ const segments = [
 const HallOfFame: React.FC = () => {
   const [activeSegment, setActiveSegment] = useState<string>("students");
   const [selectedSchool, setSelectedSchool] = useState<string>("all");
-  const [schools, setSchools] = useState<School[]>([]); // real schools only
+  const [schools, setSchools] = useState<School[]>([]);
   const [cards, setCards] = useState<HofCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  const [detailsMap, setDetailsMap] = useState<Record<number, PersonDetails | undefined>>({});
+  const [detailsMap, setDetailsMap] = useState<
+    Record<number, PersonDetails | undefined>
+  >({});
 
   // load schools once and normalize
   useEffect(() => {
@@ -34,7 +36,7 @@ const HallOfFame: React.FC = () => {
         setSchools(normalized);
       })
       .catch(() => {
-        // keep empty → "All Schools" still available via displaySchools
+        setSchools([]);
       });
   }, []);
 
@@ -48,7 +50,11 @@ const HallOfFame: React.FC = () => {
   // chips list: "All Schools" + unique schools
   const displaySchools = useMemo<School[]>(() => {
     const map = new Map<string, School>();
-    map.set("all", { id: "all", name: "All Schools", color: "#003D5C" });
+    map.set("all", {
+      id: "all",
+      name: "All Schools",
+      color: "#003D5C",
+    });
     for (const s of schools) map.set(s.id, s);
     return Array.from(map.values());
   }, [schools]);
@@ -60,7 +66,11 @@ const HallOfFame: React.FC = () => {
     setDetailsMap({});
     const schoolParam = selectedSchool === "all" ? undefined : selectedSchool;
 
-    fetchHof({ category: activeSegment, school: schoolParam, featuredOnly: false })
+    fetchHof({
+      category: activeSegment,
+      school: schoolParam,
+      featuredOnly: false,
+    })
       .then((data) => setCards(Array.isArray(data) ? data : []))
       .catch(() => setCards([]))
       .finally(() => setLoading(false));
@@ -68,7 +78,10 @@ const HallOfFame: React.FC = () => {
 
   // if selectedSchool becomes invalid after a refresh, reset to "all"
   useEffect(() => {
-    if (selectedSchool !== "all" && !schools.some((s) => s.id === selectedSchool)) {
+    if (
+      selectedSchool !== "all" &&
+      !schools.some((s) => s.id === selectedSchool)
+    ) {
       setSelectedSchool("all");
     }
   }, [schools, selectedSchool]);
@@ -80,33 +93,44 @@ const HallOfFame: React.FC = () => {
         const d = await fetchPerson(id);
         setDetailsMap((prev) => ({ ...prev, [id]: d }));
       } catch {
-        // ignore fetch error for details
+        // ignore details error
       }
     }
   };
 
   return (
-    <div className="hof-page">
+    <div className="min-h-screen bg-gradient-to-br from-[#003D5C] to-[#005580]">
       {/* Header */}
-      <header className="hof-header">
-        <div className="hof-header__content">
-          <div className="hof-header__text">
-            <span className="hof-kicker">Ngee Ann Polytechnic</span>
-            <h1 className="hof-title">Hall of Fame</h1>
-            <p className="hof-subtitle">
-              Celebrating inspiring stories of students, alumni, and staff who embody the NP spirit.
+      <header className="bg-white shadow-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-8">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+              Ngee Ann Polytechnic
+            </span>
+            <h1 className="mt-1 text-3xl font-extrabold text-[#003D5C]">
+              Hall of Fame
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 max-w-xl">
+              Celebrating inspiring stories of students, alumni, and staff who
+              embody the NP spirit.
             </p>
           </div>
-          <div className="hof-header__emblem" aria-hidden="true">
-            <Users size={40} />
+          <div
+            className="hidden items-center gap-2 rounded-full border border-[#003D5C]/10 bg-slate-50 px-4 py-2 text-sm font-semibold text-[#003D5C] shadow-sm md:flex"
+            aria-hidden="true"
+          >
+            <Users size={32} />
             <span>Celebrating Excellence</span>
           </div>
         </div>
       </header>
 
       {/* Tabs */}
-      <div className="hof-tabs-wrapper">
-        <nav className="hof-tabs" aria-label="Achievement categories">
+      <div className="border-b-4 border-[#FFB81C] bg-white">
+        <nav
+          className="mx-auto flex max-w-6xl divide-x divide-slate-100"
+          aria-label="Achievement categories"
+        >
           {segments.map((segment) => {
             const Icon = segment.icon;
             const active = activeSegment === segment.id;
@@ -114,11 +138,16 @@ const HallOfFame: React.FC = () => {
               <button
                 type="button"
                 key={`seg-${segment.id}`}
-                className={`hof-tab${active ? " is-active" : ""}`}
+                className={[
+                  "flex flex-1 items-center justify-center gap-2 px-4 py-4 text-sm font-bold uppercase tracking-wide transition-colors",
+                  active
+                    ? "bg-[#003D5C] text-white border-b-4 border-b-[#FFB81C]"
+                    : "bg-transparent text-[#003D5C] hover:bg-slate-50",
+                ].join(" ")}
                 onClick={() => setActiveSegment(segment.id)}
                 aria-pressed={active}
               >
-                <Icon size={22} />
+                <Icon size={20} />
                 <span>{segment.name}</span>
               </button>
             );
@@ -127,21 +156,31 @@ const HallOfFame: React.FC = () => {
       </div>
 
       {/* Filter chips */}
-      <section className="hof-filter" aria-label="Filter by school">
-        <div className="hof-filter__panel">
-          <h3>Filter by School</h3>
-          <div className="hof-chip-list">
+      <section
+        className="mx-auto mt-8 max-w-6xl px-4"
+        aria-label="Filter by school"
+      >
+        <div className="rounded-2xl bg-white p-4 shadow-lg shadow-black/10">
+          <h3 className="mb-3 text-base font-semibold text-[#003D5C]">
+            Filter by School
+          </h3>
+          <div className="flex flex-wrap gap-2">
             {displaySchools.map((s) => {
               const selected = selectedSchool === s.id;
-              const style =
-                selected && s.color
-                  ? ({ ["--chip-accent" as any]: s.color } as CSSProperties)
-                  : undefined;
+              const style: CSSProperties | undefined = selected && s.color
+                ? { backgroundColor: s.color, borderColor: s.color }
+                : undefined;
+
               return (
                 <button
                   type="button"
                   key={`school-${s.id}`}
-                  className={`hof-chip${selected ? " is-active" : ""}`}
+                  className={[
+                    "rounded-full border-2 px-4 py-1.5 text-xs font-semibold tracking-wide transition-colors",
+                    selected
+                      ? "text-[#1A1A1A] shadow-sm"
+                      : "bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200",
+                  ].join(" ")}
                   onClick={() => setSelectedSchool(s.id)}
                   style={style}
                   aria-pressed={selected}
@@ -155,21 +194,26 @@ const HallOfFame: React.FC = () => {
       </section>
 
       {/* Grid / Loading / Empty */}
-      <main className="hof-main">
-        <div className="hof-grid-wrapper" aria-live="polite">
+      <main className="mx-auto mb-12 mt-6 max-w-6xl px-4">
+        <div aria-live="polite">
           {loading ? (
-            <div className="hof-feedback-card">
-              <div className="hof-loading">
-                <span>Loading</span>
-                <span aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
+            <div className="flex items-center justify-center">
+              <div className="w-full max-w-xl rounded-2xl bg-white p-10 text-center text-[#003D5C] shadow-xl shadow-black/30">
+                <div className="inline-flex items-center gap-3 font-bold tracking-wide">
+                  <span>Loading</span>
+                  <span
+                    aria-hidden="true"
+                    className="flex items-center gap-1"
+                  >
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#003D5C]" />
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#003D5C] delay-150" />
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#003D5C] delay-300" />
+                  </span>
+                </div>
               </div>
             </div>
           ) : cards.length ? (
-            <div className="hof-grid">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
               {cards.map((p) => (
                 <PersonCard
                   key={`person-${p.person_id}`}
@@ -182,7 +226,11 @@ const HallOfFame: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="hof-feedback-card">No entries found for this selection</div>
+            <div className="flex items-center justify-center">
+              <div className="w-full max-w-xl rounded-2xl bg-white p-10 text-center text-[#003D5C] shadow-xl shadow-black/30">
+                No entries found for this selection
+              </div>
+            </div>
           )}
         </div>
       </main>

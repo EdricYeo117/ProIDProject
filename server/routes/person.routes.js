@@ -1,7 +1,9 @@
+// routes/person.routes.js (for example)
 const router = require('express').Router();
-const { postPerson } = require('../controllers/person.controller');
-const { ensureAdmin } = require('../controllers/upload.controller');
+const { ensureAdmin } = require('../controllers/upload.controller'); // or your existing auth
+const PersonController = require('../controllers/person.controller');
 
-router.post('/admin', ensureAdmin, postPerson); // POST /api/persons/admin
+// POST /api/admin/persons/full  (matches NewPerson.tsx)
+router.post('/api/admin/persons/full', ensureAdmin, PersonController.create);
 
 module.exports = router;

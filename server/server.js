@@ -15,6 +15,8 @@ const adminRoutes = require("./routes/admin.routes");
 const milestonesRoutes = require("./routes/milestones.routes");
 const createMessagesRouter = require("./routes/messages.routes"); // factory(io)
 const boardsRoutes = require("./routes/boards.routes");
+const achievementTypesRoutes = require('./routes/achievementTypes.routes');
+
 
 const BOARD_FALLBACK = "NP-MEMORY-WALL-2025";
 
@@ -51,6 +53,7 @@ app.use("/api", hofRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/milestones", milestonesRoutes);
 app.use("/api/boards", boardsRoutes);
+app.use(achievementTypesRoutes);
 
 /* ---------- HTTP server + Socket.IO ---------- */
 const port = Number(process.env.PORT) || 8080;

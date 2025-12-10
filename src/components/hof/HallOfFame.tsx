@@ -17,7 +17,9 @@ const HallOfFame: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [cards, setCards] = useState<HofCard[]>([]);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+
+  // independent expansion per card index
+  const [expandedMap, setExpandedMap] = useState<Record<number, boolean>>({});
   const [detailsMap, setDetailsMap] = useState<
     Record<number, PersonDetails | undefined>
   >({});
@@ -35,9 +37,7 @@ const HallOfFame: React.FC = () => {
           .filter((s: School) => !!s.id && !!s.name);
         setSchools(normalized);
       })
-      .catch(() => {
-        setSchools([]);
-      });
+      .catch(() => setSchools([]));
   }, []);
 
   // color lookup by school_name
@@ -47,14 +47,10 @@ const HallOfFame: React.FC = () => {
     return m;
   }, [schools]);
 
-  // chips list: "All Schools" + unique schools
+  // chips list
   const displaySchools = useMemo<School[]>(() => {
     const map = new Map<string, School>();
-    map.set("all", {
-      id: "all",
-      name: "All Schools",
-      color: "#003D5C",
-    });
+    map.set("all", { id: "all", name: "All Schools", color: "#003D5C" });
     for (const s of schools) map.set(s.id, s);
     return Array.from(map.values());
   }, [schools]);
@@ -62,8 +58,9 @@ const HallOfFame: React.FC = () => {
   // fetch cards on filter change
   useEffect(() => {
     setLoading(true);
-    setExpanded({});
+    setExpandedMap({});
     setDetailsMap({});
+
     const schoolParam = selectedSchool === "all" ? undefined : selectedSchool;
 
     fetchHof({
@@ -86,14 +83,20 @@ const HallOfFame: React.FC = () => {
     }
   }, [schools, selectedSchool]);
 
-  const toggle = async (id: number) => {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    if (!detailsMap[id]) {
+  // toggle by card index; fetch details by personId
+  const toggle = async (cardIndex: number, personIdRaw: number | string) => {
+    const personId = Number(personIdRaw);
+    setExpandedMap((prev) => ({
+      ...prev,
+      [cardIndex]: !prev[cardIndex],
+    }));
+
+    if (!detailsMap[cardIndex] && personId) {
       try {
-        const d = await fetchPerson(id);
-        setDetailsMap((prev) => ({ ...prev, [id]: d }));
+        const d = await fetchPerson(personId);
+        setDetailsMap((prev) => ({ ...prev, [cardIndex]: d }));
       } catch {
-        // ignore details error
+        // ignore
       }
     }
   };
@@ -167,9 +170,10 @@ const HallOfFame: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             {displaySchools.map((s) => {
               const selected = selectedSchool === s.id;
-              const style: CSSProperties | undefined = selected && s.color
-                ? { backgroundColor: s.color, borderColor: s.color }
-                : undefined;
+              const style: CSSProperties | undefined =
+                selected && s.color
+                  ? { backgroundColor: s.color, borderColor: s.color }
+                  : undefined;
 
               return (
                 <button
@@ -213,17 +217,20 @@ const HallOfFame: React.FC = () => {
               </div>
             </div>
           ) : cards.length ? (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {cards.map((p) => (
-                <PersonCard
-                  key={`person-${p.person_id}`}
-                  person={p}
-                  schoolColor={schoolColorByName.get(p.school_name)}
-                  expanded={!!expanded[p.person_id]}
-                  details={detailsMap[p.person_id]}
-                  onToggle={toggle}
-                />
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {cards.map((p, index) => {
+                const personId = p.person_id;
+                return (
+                  <PersonCard
+                    key={`person-card-${index}`}
+                    person={p}
+                    schoolColor={schoolColorByName.get(p.school_name)}
+                    expanded={!!expandedMap[index]}
+                    details={detailsMap[index]}
+                    onToggle={() => toggle(index, personId)}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="flex items-center justify-center">

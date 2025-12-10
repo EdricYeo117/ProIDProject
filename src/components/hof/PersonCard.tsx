@@ -12,6 +12,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import type { HofCard, PersonDetails } from "./types";
+import CommentsSection from "./CommentsSection";
 
 const colors = {
   npBlue: "#003D5C",
@@ -44,7 +45,7 @@ type Props = {
   schoolColor?: string;
   expanded: boolean;
   details?: PersonDetails;
-  onToggle: (id: number) => void;
+  onToggle: () => void;
 };
 
 const getInitials = (name?: string | null) => {
@@ -65,9 +66,7 @@ const PersonCard: React.FC<Props> = ({
   onToggle,
 }) => {
   const border = schoolColor ?? colors.npGold;
-  const cardStyle: CSSProperties = {
-    borderColor: border,
-  };
+  const cardStyle: CSSProperties = { borderColor: border };
 
   const achievements = expanded ? details?.achievements : undefined;
   const totalAchievements = Number(person.achievement_count) || 0;
@@ -75,7 +74,7 @@ const PersonCard: React.FC<Props> = ({
 
   return (
     <article
-      className="relative flex flex-col gap-4 rounded-3xl border-2 bg-white p-7 shadow-[0_20px_44px_rgba(0,24,39,0.14)] transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_26px_56px_rgba(0,24,39,0.2)]"
+      className="relative flex w-full flex-col gap-4 rounded-3xl border-2 bg-white p-7 shadow-[0_20px_44px_rgba(0,24,39,0.14)] transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_26px_56px_rgba(0,24,39,0.2)]"
       style={cardStyle}
       aria-label={`${person.full_name} profile card`}
     >
@@ -132,8 +131,8 @@ const PersonCard: React.FC<Props> = ({
               const meta = a.year || a.semester || a.date || a.type;
               return (
                 <div
-                  className="flex gap-3 rounded-2xl border border-amber-300 bg-gradient-to-br from-[#f9fbfd] to-[#eef3f9] p-3.5 shadow-[0_16px_26px_rgba(0,24,39,0.12)]"
                   key={a.achievement_id}
+                  className="flex gap-3 rounded-2xl border border-amber-300 bg-gradient-to-br from-[#f9fbfd] to-[#eef3f9] p-3.5 shadow-[0_16px_26px_rgba(0,24,39,0.12)]"
                 >
                   <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#003D5C] text-white">
                     <Icon size={18} />
@@ -158,8 +157,8 @@ const PersonCard: React.FC<Props> = ({
             })
           : person.top_achievement && (
               <div
-                className="flex gap-3 rounded-2xl border border-amber-300 bg-gradient-to-br from-[#f9fbfd] to-[#eef3f9] p-3.5 shadow-[0_16px_26px_rgba(0,24,39,0.12)]"
                 key={`${person.person_id}-top`}
+                className="flex gap-3 rounded-2xl border border-amber-300 bg-gradient-to-br from-[#f9fbfd] to-[#eef3f9] p-3.5 shadow-[0_16px_26px_rgba(0,24,39,0.12)]"
               >
                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#003D5C] text-white">
                   <Star size={18} />
@@ -173,11 +172,14 @@ const PersonCard: React.FC<Props> = ({
             )}
       </div>
 
+      {/* Comments – only when expanded */}
+      {expanded && <CommentsSection personId={person.person_id} />}
+
       {/* Toggle button */}
       <button
         type="button"
         className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#003D5C] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-white transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#002f47] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB81C]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-        onClick={() => onToggle(person.person_id)}
+        onClick={onToggle}
         aria-expanded={expanded}
       >
         {expanded ? (

@@ -1,15 +1,16 @@
 // src/service/db.service.js
 const oracledb = require('oracledb');
+
 // Return CLOBs as strings instead of LOB streams
-oracledb.fetchAsString = [ oracledb.CLOB ];
+oracledb.fetchAsString = [oracledb.CLOB];
+
+// Default outFormat for all connections
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
+
 let pool;
 
 async function initPool() {
   if (pool) return pool;
-
-  // return rows as objects
-  oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 
   pool = await oracledb.createPool({
     user: process.env.ORACLE_USER,
@@ -18,7 +19,7 @@ async function initPool() {
     poolMin: 1,
     poolMax: 10,
     poolIncrement: 1,
-    queueTimeout: 120000
+    queueTimeout: 120000,
   });
 
   return pool;
@@ -27,20 +28,33 @@ async function initPool() {
 async function execute(sql, binds = {}, options = {}) {
   if (!pool) await initPool();
   let conn;
+
   try {
     conn = await pool.getConnection();
-    return await conn.execute(sql, binds, {
+
+    // Default: autoCommit ON for simple web-style operations.
+    const execOptions = {
       outFormat: oracledb.OUT_FORMAT_OBJECT,
-      autoCommit: false,
-      ...options
-    });
+      autoCommit: true,        // <<< changed from false
+      ...options,              // allow per-call override
+    };
+
+    return await conn.execute(sql, binds, execOptions);
   } finally {
-    try { if (conn) await conn.close(); } catch {}
+    if (conn) {
+      try {
+        await conn.close();
+      } catch {
+        // ignore close errors
+      }
+    }
   }
 }
 
+// For rare cases where you want manual transaction control:
 async function getConnection() {
   if (!pool) await initPool();
+  // You can do conn.execute(..., { autoCommit: false }) and commit/rollback manually.
   return pool.getConnection();
 }
 

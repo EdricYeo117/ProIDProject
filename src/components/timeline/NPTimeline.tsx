@@ -1,5 +1,7 @@
 // src/components/timeline/NPTimeline.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import QRCode from "react-qr-code";
 import {
   Calendar,
   Award,
@@ -642,13 +644,57 @@ export default function NPTimeline() {
                   <p className="text-slate-300 leading-relaxed mb-6">
                     {selectedMilestone.description}
                   </p>
+         {(() => {
+  const year = String(selectedMilestone.year);
+  const infoPath = `/timeline/${year}/info`;
 
-                  <button
-                    onClick={() => setSelectedMilestone(null)}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-lg"
-                  >
-                    Close
-                  </button>
+  // Use a public base URL if you want phone scanning to work on LAN
+  // e.g. VITE_PUBLIC_BASE_URL=http://192.168.1.23:5173
+  const base = (import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin)
+    .toString()
+    .replace(/\/+$/, "");
+
+  const infoUrl = `${base}${infoPath}`;
+
+  return (
+    <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-white">More information</div>
+        <div className="text-xs text-slate-300">
+          Scan or click the QR code to open the full page.
+        </div>
+        <div className="mt-1 text-[11px] font-mono text-slate-400 break-all">
+          {infoPath}
+        </div>
+
+        {/* optional: explicit link text */}
+        <Link
+          to={infoPath}
+          className="mt-2 inline-block text-xs text-blue-300 hover:text-blue-200 underline underline-offset-2"
+        >
+          Open details page
+        </Link>
+      </div>
+
+      {/* Clickable QR */}
+      <Link
+        to={infoPath}
+        className="shrink-0 rounded-lg bg-white p-2 shadow-sm hover:opacity-95"
+        aria-label={`Open ${year} info page`}
+        title="Open details page"
+      >
+        <QRCode value={infoUrl} size={84} />
+      </Link>
+    </div>
+  );
+})()}
+
+<button
+  onClick={() => setSelectedMilestone(null)}
+  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-lg"
+>
+  Close
+</button>
                 </>
               );
             })()}

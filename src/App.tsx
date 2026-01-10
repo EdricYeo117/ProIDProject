@@ -6,6 +6,7 @@ import NewPerson from "./components/admin/NewPerson";
 import NPTimeline from "./components/timeline/NPTimeline";
 import TopNav from "./components/common/TopNav";
 import CommunityCanvas from "./components/canvas/CommunityCanvas";
+import TimelineInfoPage from "./components/timeline/info/TimelineInfoPage";
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -45,7 +46,12 @@ const App: React.FC = () => {
           <Route path="/" element={<HallOfFame />} />
           <Route path="/hall-of-fame" element={<HallOfFame />} />
           <Route path="/timeline" element={<NPTimeline />} />
+
+          {/* ✅ NEW: timeline info page */}
+          <Route path="/timeline/:year/info" element={<TimelineInfoPage />} />
+
           <Route path="/community-canvas" element={<CommunityCanvas />} />
+
           {/* Admin */}
           <Route path="/admin" element={<NewPerson />} />
           <Route path="/admin/new-person" element={<NewPerson />} />

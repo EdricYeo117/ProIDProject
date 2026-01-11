@@ -7,5 +7,8 @@ export const timelineInfoLoaders: Record<
 > = {
   "1963": () => import("./pages/1963"),
   "1970": () => import("./pages/1970"),
+  "1982": () => import("./pages/1982"),
+  "2013": () => import("./pages/2013"),
+  "2023": () => import("./pages/2023"),
   // Add more years here later
 };

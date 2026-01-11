@@ -3,6 +3,107 @@ import { Link, useParams } from "react-router-dom";
 import type { TimelineInfo } from "./types";
 import { timelineInfoLoaders } from "./registry";
 
+/* ─────────────────────────── Paragraph boxing ─────────────────────────── */
+
+type Block =
+  | { type: "heading"; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "list"; items: string[] };
+
+function parseLongTextToBlocks(longText: string): Block[] {
+  const chunks = longText
+    .split(/\n\s*\n/g)
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  const blocks: Block[] = [];
+  let i = 0;
+
+  while (i < chunks.length) {
+    const chunk = chunks[i];
+
+    // Exact heading chunk, e.g. "Background:"
+    const headingMatch = chunk.match(/^([A-Za-z][A-Za-z\s]+):$/);
+    if (headingMatch) {
+      blocks.push({ type: "heading", text: headingMatch[1] });
+      i += 1;
+      continue;
+    }
+
+    // Heading + numbered list in next chunk
+    const maybeHeading = chunk.match(/^(.+):$/);
+    const next = chunks[i + 1] ?? "";
+    const nextHasNumbered = next
+      .split("\n")
+      .some((l) => /^\d+\.\s+/.test(l.trim()));
+
+    if (maybeHeading && nextHasNumbered) {
+      blocks.push({ type: "heading", text: maybeHeading[1] });
+      blocks.push({
+        type: "list",
+        items: next
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((l) => l.replace(/^\d+\.\s+/, "")),
+      });
+      i += 2;
+      continue;
+    }
+
+    // Pure numbered list chunk
+    const lines = chunk
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const isNumberedList =
+      lines.length >= 2 && lines.every((l) => /^\d+\.\s+/.test(l));
+
+    if (isNumberedList) {
+      blocks.push({
+        type: "list",
+        items: lines.map((l) => l.replace(/^\d+\.\s+/, "")),
+      });
+      i += 1;
+      continue;
+    }
+
+    // Normal paragraph
+    blocks.push({ type: "paragraph", text: chunk });
+    i += 1;
+  }
+
+  return blocks;
+}
+
+function ParagraphBox({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "soft";
+}) {
+  const base =
+    tone === "soft"
+      ? "border-indigo-500/10 bg-slate-900/35"
+      : "border-indigo-500/15 bg-slate-950/25";
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border backdrop-blur p-5 sm:p-6",
+        "shadow-[0_10px_30px_rgba(0,0,0,0.25)]",
+        base,
+      ].join(" ")}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ─────────────────────────── Page ─────────────────────────── */
+
 export default function TimelineInfoPage() {
   const { year } = useParams();
   const [info, setInfo] = useState<TimelineInfo | null>(null);
@@ -124,6 +225,8 @@ export default function TimelineInfoPage() {
   }
 
   // Ready state
+  const blocks = parseLongTextToBlocks(info.longText);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative overflow-hidden">
       {/* Animated background elements */}
@@ -187,11 +290,49 @@ export default function TimelineInfoPage() {
 
             {/* Content section */}
             <div className="p-8 sm:p-10">
-              <article className="prose prose-invert prose-lg max-w-none">
-                <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-base sm:text-lg">
-                  {info.longText}
-                </div>
-              </article>
+              {/* Boxed sections */}
+              <div className="space-y-4">
+                {blocks.map((b, idx) => {
+                  if (b.type === "heading") {
+                    return (
+                      <div key={`${b.type}-${idx}`} className="pt-2">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
+                          <div className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-purple-200 uppercase tracking-wider">
+                            {b.text}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (b.type === "list") {
+                    return (
+                      <ParagraphBox key={`${b.type}-${idx}`} tone="soft">
+                        <div className="text-slate-100 text-base sm:text-lg font-semibold mb-3">
+                          Key points
+                        </div>
+                        <ol className="list-decimal pl-5 space-y-2 text-slate-200 leading-relaxed text-base sm:text-lg">
+                          {b.items.map((item, i) => (
+                            <li key={i} className="marker:text-indigo-300">
+                              {item}
+                            </li>
+                          ))}
+                        </ol>
+                      </ParagraphBox>
+                    );
+                  }
+
+                  // paragraph
+                  return (
+                    <ParagraphBox key={`${b.type}-${idx}`}>
+                      <p className="text-slate-200 leading-relaxed text-base sm:text-lg">
+                        {b.text}
+                      </p>
+                    </ParagraphBox>
+                  );
+                })}
+              </div>
 
               {/* Sources section */}
               <div className="mt-12 pt-8 border-t border-indigo-500/10">
@@ -274,6 +415,9 @@ export default function TimelineInfoPage() {
                   )}
                 </button>
               </div>
+
+              {/* Unused but kept for clarity if you later want to show the current path */}
+              <div className="sr-only">{infoPath}</div>
             </div>
           </div>
 

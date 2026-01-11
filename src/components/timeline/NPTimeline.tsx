@@ -12,6 +12,7 @@ import {
   Leaf,
   Users,
 } from "lucide-react";
+import { timelineInfoLoaders } from "./info/registry";
 
 /* ─────────────────────────── Types & utils ─────────────────────────── */
 
@@ -225,6 +226,8 @@ export default function NPTimeline() {
   const [eraFilter, setEraFilter] = useState<Set<string>>(new Set()); // empty = ALL
   const [eraH, setEraH] = useState(72); // fallback height for the era pill
   const firstEraRef = useRef<HTMLDivElement | null>(null);
+
+  // Info page loaders
 
   // ⬇️ MOVE THESE INSIDE THE COMPONENT
   const trayRef = useRef<HTMLDivElement | null>(null);
@@ -644,9 +647,14 @@ export default function NPTimeline() {
                   <p className="text-slate-300 leading-relaxed mb-6">
                     {selectedMilestone.description}
                   </p>
-         {(() => {
-  const year = String(selectedMilestone.year);
-  const infoPath = `/timeline/${year}/info`;
+{(() => {
+  const yearStr = String(selectedMilestone.year);
+
+  // ✅ Only show QR + link if an info page exists in the registry
+  const hasInfo = !!timelineInfoLoaders[yearStr];
+  if (!hasInfo) return null;
+
+  const infoPath = `/timeline/${yearStr}/info`;
 
   // Use a public base URL if you want phone scanning to work on LAN
   // e.g. VITE_PUBLIC_BASE_URL=http://192.168.1.23:5173
@@ -667,7 +675,6 @@ export default function NPTimeline() {
           {infoPath}
         </div>
 
-        {/* optional: explicit link text */}
         <Link
           to={infoPath}
           className="mt-2 inline-block text-xs text-blue-300 hover:text-blue-200 underline underline-offset-2"
@@ -680,7 +687,7 @@ export default function NPTimeline() {
       <Link
         to={infoPath}
         className="shrink-0 rounded-lg bg-white p-2 shadow-sm hover:opacity-95"
-        aria-label={`Open ${year} info page`}
+        aria-label={`Open ${yearStr} info page`}
         title="Open details page"
       >
         <QRCode value={infoUrl} size={84} />

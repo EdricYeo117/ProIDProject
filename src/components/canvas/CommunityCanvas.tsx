@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
+// src/components/canvas/CommunityCanvas.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client";
 
 type MessageColor = "sky" | "emerald" | "amber" | "violet";
+
+type ReactionsMap = Record<string, number>; // emoji -> count
 
 type Message = {
   id: string;
@@ -12,6 +15,12 @@ type Message = {
   createdAt: string;
   boardKey?: string;
   color?: MessageColor;
+
+  // author-picked “emotion” for the note itself (single emoji)
+  feel?: string | null;
+
+  // aggregated counters (real-time)
+  reactions?: ReactionsMap;
 };
 
 type Board = {
@@ -28,6 +37,7 @@ type Board = {
 const WORLD_SIZE = 5000;
 const API_BASE = "http://localhost:8080";
 
+// Note border styles by category color
 const COLOR_STYLES: Record<MessageColor, string> = {
   sky: "border-sky-500 shadow-sky-900/40",
   emerald: "border-emerald-500 shadow-emerald-900/40",
@@ -39,18 +49,63 @@ const DOT_STYLES: Record<MessageColor, string> = {
   sky: "bg-sky-400 shadow-sky-500/50",
   emerald: "bg-emerald-400 shadow-emerald-500/50",
   amber: "bg-amber-400 shadow-amber-500/50",
-  violet: "bg-violet-400 shadow-violet-500/50",
+  violet: "bg-violet-400 shadow-amber-500/50",
 };
+
+const FEEL_GLOW: Record<string, string> = {
+  "❤️": "ring-1 ring-rose-400/40 shadow-[0_0_40px_rgba(244,63,94,0.18)]",
+  "😂": "ring-1 ring-amber-300/40 shadow-[0_0_40px_rgba(251,191,36,0.18)]",
+  "🥹": "ring-1 ring-sky-300/40 shadow-[0_0_40px_rgba(56,189,248,0.18)]",
+  "🔥": "ring-1 ring-orange-400/40 shadow-[0_0_40px_rgba(249,115,22,0.20)]",
+  "🙏": "ring-1 ring-violet-300/40 shadow-[0_0_40px_rgba(167,139,250,0.18)]",
+  "🤯": "ring-1 ring-emerald-300/40 shadow-[0_0_40px_rgba(52,211,153,0.18)]",
+};
+
+const FEEL_GRADIENT: Record<string, string> = {
+  "❤️": "bg-gradient-to-r from-rose-500/70 via-pink-500/50 to-fuchsia-500/40",
+  "😂": "bg-gradient-to-r from-amber-400/70 via-yellow-300/50 to-orange-400/40",
+  "🥹": "bg-gradient-to-r from-sky-400/70 via-cyan-300/50 to-blue-400/40",
+  "🔥": "bg-gradient-to-r from-orange-500/70 via-amber-400/50 to-red-500/40",
+  "🙏": "bg-gradient-to-r from-violet-400/70 via-fuchsia-400/50 to-indigo-400/40",
+  "🤯": "bg-gradient-to-r from-emerald-400/70 via-teal-300/50 to-lime-400/40",
+};
+
 
 const COLOR_OPTIONS: { value: MessageColor; label: string }[] = [
   { value: "sky", label: "Memory" },
-  { value: "emerald", label: "Gratitude" },
+  { dramatic: undefined as never, value: "emerald", label: "Gratitude" },
   { value: "amber", label: "Milestone" },
   { value: "violet", label: "Fun / Random" },
 ];
 
+// Single “feel” emoji for the note author
+const FEEL_OPTIONS: { value: string; label: string }[] = [
+  { value: "❤️", label: "Loved it" },
+  { value: "😂", label: "Funny" },
+  { value: "🥹", label: "Emotional" },
+  { value: "🔥", label: "Proud / hype" },
+  { value: "🙏", label: "Grateful" },
+  { value: "🤯", label: "Mind-blown" },
+];
+
+// Reaction bar emojis (counters)
+const REACTION_OPTIONS: string[] = ["❤️", "👏", "😂", "😮", "🙏"];
+
+// Stable per-browser identity used to prevent accidental multi-spam (and for backend uniqueness if you enforce it)
+const reactorKey =
+  localStorage.getItem("canvas_reactor_key") ??
+  (() => {
+    const v = crypto.randomUUID();
+    localStorage.setItem("canvas_reactor_key", v);
+    return v;
+  })();
+
+const clamp = (n: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, n));
+
 const CommunityCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const [scale, setScale] = useState(0.2);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -86,24 +141,30 @@ const CommunityCanvas: React.FC = () => {
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formColor, setFormColor] = useState<MessageColor>("sky");
+  const [formFeel, setFormFeel] = useState<string>("❤️"); // author “emotion”
+
+  // Only one note open at a time (prevents overlapping cards)
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+
+  // small client-side debounce to avoid accidental double taps
+  const [reactionBusy, setReactionBusy] = useState<Record<string, boolean>>({}); // key: `${msgId}:${emoji}`
+
+  /* ---------- Center world initially ---------- */
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const initialScale = scale;
+    const worldPxWidth = WORLD_SIZE * initialScale;
+    const worldPxHeight = WORLD_SIZE * initialScale;
+
+    setOffset({
+      x: (rect.width - worldPxWidth) / 2,
+      y: (rect.height - worldPxHeight) / 2,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---------- Load boards ---------- */
-  // center the world initially
-useEffect(() => {
-  if (!containerRef.current) return;
-
-  const rect = containerRef.current.getBoundingClientRect();
-  const initialScale = scale; // 0.2 by default
-  const worldPxWidth = WORLD_SIZE * initialScale;
-  const worldPxHeight = WORLD_SIZE * initialScale;
-
-  setOffset({
-    x: (rect.width - worldPxWidth) / 2,
-    y: (rect.height - worldPxHeight) / 2,
-  });
-}, []); // run once
-
-// load boards list
   useEffect(() => {
     const loadBoards = async () => {
       setBoardsLoading(true);
@@ -113,9 +174,8 @@ useEffect(() => {
         if (!res.ok) throw new Error("Failed to load boards");
         const data = (await res.json()) as Board[];
         setBoards(data);
-        if (!selectedBoardKey && data.length > 0) {
+        if (!selectedBoardKey && data.length > 0)
           setSelectedBoardKey(data[0].boardKey);
-        }
       } catch (err) {
         console.error(err);
         setBoardsError("Failed to load boards");
@@ -123,24 +183,29 @@ useEffect(() => {
         setBoardsLoading(false);
       }
     };
-
     loadBoards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- WebSocket: retrieve + live updates per board ---------- */
+  /* ---------- WebSocket: init + live updates per board ---------- */
   useEffect(() => {
     if (!selectedBoardKey) return;
 
     let isMounted = true;
     setMessages([]);
     setLoading(true);
+    setActiveMessageId(null);
 
-    const socket = io(API_BASE, {
-      transports: ["websocket"],
-    });
+    // clean existing socket
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    const socket = io(API_BASE, { transports: ["websocket"] });
+    socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Connected to canvas socket:", socket.id);
       socket.emit("canvas:join", { boardKey: selectedBoardKey });
     });
 
@@ -149,7 +214,7 @@ useEffect(() => {
       (payload: { boardKey: string; messages: Message[] }) => {
         if (!isMounted) return;
         if (payload.boardKey !== selectedBoardKey) return;
-        setMessages(payload.messages);
+        setMessages(payload.messages ?? []);
         setLoading(false);
       }
     );
@@ -160,6 +225,7 @@ useEffect(() => {
     });
 
     socket.on("canvas:new-message", (msg: Message) => {
+      if (!isMounted) return;
       if (msg.boardKey && msg.boardKey !== selectedBoardKey) return;
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
@@ -167,24 +233,48 @@ useEffect(() => {
       });
     });
 
+    // Real-time counter updates
+    socket.on(
+      "canvas:reaction-update",
+      (payload: {
+        messageId: string | number;
+        emoji: string;
+        count: number;
+      }) => {
+        if (!isMounted) return;
+
+        const mid = String(payload.messageId);
+
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (String(msg.id) !== mid) return msg;
+            return {
+              ...msg,
+              reactions: {
+                ...(msg.reactions ?? {}),
+                [payload.emoji]: payload.count,
+              },
+            };
+          })
+        );
+      }
+    );
     socket.on("disconnect", () => {
-      console.log("Canvas socket disconnected");
+      // optional logging
     });
 
     return () => {
       isMounted = false;
       socket.disconnect();
+      if (socketRef.current === socket) socketRef.current = null;
     };
   }, [selectedBoardKey]);
 
   /* ---------- Canvas helpers ---------- */
-
-  const screenToWorld = (screenX: number, screenY: number) => {
-    return {
-      x: (screenX - offset.x) / scale,
-      y: (screenY - offset.y) / scale,
-    };
-  };
+  const screenToWorld = (screenX: number, screenY: number) => ({
+    x: (screenX - offset.x) / scale,
+    y: (screenY - offset.y) / scale,
+  });
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -199,7 +289,7 @@ useEffect(() => {
     const prevScale = scale;
 
     let newScale = prevScale * (1 + delta * zoomFactor);
-    newScale = Math.max(0.05, Math.min(newScale, 3));
+    newScale = clamp(newScale, 0.05, 3);
 
     const worldX = (mouseX - offset.x) / prevScale;
     const worldY = (mouseY - offset.y) / prevScale;
@@ -222,17 +312,45 @@ useEffect(() => {
     if (!isPanning) return;
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
-    setOffset({
-      x: offsetStart.x + dx,
-      y: offsetStart.y + dy,
-    });
+    setOffset({ x: offsetStart.x + dx, y: offsetStart.y + dy });
   };
 
   const handleMouseUp = () => setIsPanning(false);
   const handleMouseLeave = () => setIsPanning(false);
 
-  /* ---------- Message form ---------- */
+  /* ---------- Open note (prevents overlap) ---------- */
+  const toggleOpenMessage = (id: string) => {
+    setActiveMessageId((curr) => (curr === id ? null : id));
+  };
 
+  /* ---------- Add reaction (real-time) ---------- */
+  const sendReaction = (messageId: string, emoji: string) => {
+    if (!selectedBoardKey) return;
+
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const busyKey = `${messageId}:${emoji}`;
+    if (reactionBusy[busyKey]) return;
+
+    setReactionBusy((p) => ({ ...p, [busyKey]: true }));
+
+    socket.emit("canvas:react", {
+      boardKey: selectedBoardKey,
+      messageId,
+      emoji,
+    });
+
+    window.setTimeout(() => {
+      setReactionBusy((p) => {
+        const next = { ...p };
+        delete next[busyKey];
+        return next;
+      });
+    }, 120); // keep small debounce for double-taps; reduce/remove if you want
+  };
+
+  /* ---------- Message form ---------- */
   const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (formOpen || !containerRef.current) return;
     if (!selectedBoardKey) {
@@ -248,7 +366,8 @@ useEffect(() => {
     setPendingCoords(world);
     setFormAuthor("");
     setFormText("");
-    setFormColor("sky"); // default each time
+    setFormColor("sky");
+    setFormFeel("❤️");
     setFormError(null);
     setFormOpen(true);
   };
@@ -261,7 +380,6 @@ useEffect(() => {
       setFormError("Please write a short message before submitting.");
       return;
     }
-
     if (!selectedBoardKey) {
       setFormError("Please select a board before posting.");
       return;
@@ -277,6 +395,7 @@ useEffect(() => {
       text: formText.trim(),
       author: formAuthor.trim() || "Anonymous",
       color: formColor,
+      feel: formFeel, // author “emotion”
     };
 
     try {
@@ -291,7 +410,6 @@ useEffect(() => {
         throw new Error(err.error || "Failed to save message");
       }
 
-      // server will broadcast canvas:new-message; we just close the form
       setFormOpen(false);
       setPendingCoords(null);
       setFormText("");
@@ -312,10 +430,7 @@ useEffect(() => {
     setFormError(null);
   };
 
-  const showFullText = scale > 0.5;
-
   /* ---------- New board form ---------- */
-
   const handleCreateBoardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBoardTitle.trim()) {
@@ -354,14 +469,19 @@ useEffect(() => {
     }
   };
 
-  /* ---------- Render ---------- */
+  const showCards = scale > 0.5;
 
+  const boardTitle = useMemo(() => {
+    const b = boards.find((x) => x.boardKey === selectedBoardKey);
+    return b?.title ?? "Community Memory Wall";
+  }, [boards, selectedBoardKey]);
+
+  /* ---------- Render ---------- */
   return (
     <div className="w-full h-[calc(100vh-64px)] bg-slate-900 flex flex-col">
       <div className="p-3 text-sm text-slate-100 flex items-center gap-4 border-b border-slate-700">
-        <div className="font-semibold text-base">Community Memory Wall</div>
+        <div className="font-semibold text-base">{boardTitle}</div>
 
-        {/* Board selector */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-300">Board:</span>
           <select
@@ -376,6 +496,7 @@ useEffect(() => {
               </option>
             ))}
           </select>
+
           <button
             type="button"
             onClick={() => {
@@ -389,104 +510,189 @@ useEffect(() => {
           >
             New board
           </button>
+
           {boardsError && (
             <span className="text-[0.7rem] text-red-400">{boardsError}</span>
           )}
         </div>
 
-        <div>Zoom: {(scale * 100).toFixed(0)}%</div>
-        {loading && <div className="text-slate-400">Loading messages…</div>}
+        <div className="text-xs text-slate-300">
+          Zoom: {(scale * 100).toFixed(0)}%
+        </div>
+        {loading && (
+          <div className="text-slate-400 text-xs">Loading messages…</div>
+        )}
+
         <div className="ml-auto text-xs text-slate-400">
-          Scroll to zoom • drag to pan • double-click anywhere to leave a note
+          Scroll to zoom • drag to pan • double-click to leave a note • click a
+          dot to open
         </div>
       </div>
 
-{/* canvas area */}
-<div className="flex-1 flex items-center justify-center bg-slate-900">
+      {/* canvas area */}
+      <div className="flex-1 flex items-center justify-center bg-slate-900">
+        <div
+          ref={containerRef}
+          className="
+            relative
+            w-[min(1400px,96vw)]
+            h-[min(800px,82vh)]
+            rounded-[32px]
+            border-2 border-slate-600/70
+            bg-slate-950/80
+            shadow-[0_0_140px_rgba(15,23,42,1)]
+            overflow-hidden
+            cursor-grab active:cursor-grabbing
+          "
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onDoubleClick={handleDoubleClick}
+        >
+          <div
+            className="absolute bg-slate-900"
+            style={{
+              width: WORLD_SIZE,
+              height: WORLD_SIZE,
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+              transformOrigin: "0 0",
+              backgroundImage:
+                "radial-gradient(circle, rgba(148,163,184,0.15) 1px, transparent 0)",
+              backgroundSize: "40px 40px",
+            }}
+          >
+            {messages.map((m) => {
+              const color = m.color ?? "sky";
+              const isOpen = activeMessageId === m.id;
+              const feelFrame = m.feel ? (FEEL_GRADIENT[m.feel] ?? "") : "";
+              const feelGlow = m.feel ? (FEEL_GLOW[m.feel] ?? "") : "";
+              return (
+                <div
+                  key={m.id}
+                  className="absolute"
+                  style={{ left: m.x, top: m.y, zIndex: isOpen ? 50 : 1 }}
+                  onMouseDown={(e) => e.stopPropagation()} // prevent panning when interacting with note
+                  onDoubleClick={(e) => e.stopPropagation()} // prevent creating note over existing
+                >
+                  {/* anchor dot */}
+                  <button
+                    type="button"
+                    className={`w-3 h-3 rounded-full shadow-md transition-transform hover:scale-110 ${DOT_STYLES[color]}`}
+                    title="Open note"
+                    onClick={() => toggleOpenMessage(m.id)}
+                  />
+
+{/* card (only one open at a time => no overlap mess) */}
+{showCards && isOpen && (
   <div
-    ref={containerRef}
-    className="
-      relative
-      w-[min(1400px,96vw)]    /* wider */
-      h-[min(800px,82vh)]     /* taller */
-      rounded-[32px]
-      border-2 border-slate-600/70   /* thicker border */
-      bg-slate-950/80
-      shadow-[0_0_140px_rgba(15,23,42,1)]
-      overflow-hidden
-      cursor-grab active:cursor-grabbing
-    "
-    onWheel={handleWheel}
-    onMouseDown={handleMouseDown}
-    onMouseMove={handleMouseMove}
-    onMouseUp={handleMouseUp}
-    onMouseLeave={handleMouseLeave}
-    onDoubleClick={handleDoubleClick}
+    className={`mt-2 w-[360px] max-w-[360px] rounded-2xl p-[1px] ${feelFrame}`}
   >
     <div
-      className="absolute bg-slate-900"
-      style={{
-        width: WORLD_SIZE,
-        height: WORLD_SIZE,
-        transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-        transformOrigin: "0 0",
-        backgroundImage:
-          "radial-gradient(circle, rgba(148,163,184,0.15) 1px, transparent 0)",
-        backgroundSize: "40px 40px",
-      }}
+      className={`
+        rounded-2xl bg-slate-900/95 px-4 py-3
+        text-xs text-slate-100 shadow-xl backdrop-blur-sm
+        border relative
+        ${COLOR_STYLES[color]}
+        ${feelGlow}
+      `}
     >
-          {messages.map((m) => {
-            const color = m.color ?? "sky";
+      {/* tail */}
+      <div className="absolute -top-1 left-3 w-2 h-2 bg-slate-900 border-l border-t border-sky-500/70 rotate-45" />
+
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-semibold text-[0.8rem] text-sky-300">
+            {m.author ?? "Anonymous"}
+          </div>
+          <div className="mt-1 leading-snug text-[0.82rem] break-words">
+            {m.text}
+          </div>
+        </div>
+
+        {/* author “feel” */}
+        {m.feel ? (
+          <div
+            className={`
+              shrink-0 w-8 h-8 rounded-full
+              bg-slate-800/70 border border-slate-600
+              flex items-center justify-center text-base
+              ${FEEL_GLOW[m.feel] ?? ""}
+            `}
+            title="Note feel"
+          >
+            {m.feel}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-2 text-[0.7rem] text-slate-400 flex items-center justify-between">
+        <span>
+          {new Date(m.createdAt).toLocaleDateString("en-SG", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </span>
+        <span>
+          {new Date(m.createdAt).toLocaleTimeString("en-SG", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      </div>
+
+      {/* reactions */}
+      <div className="mt-3">
+        <div className="text-[0.7rem] text-slate-400 mb-1">React to this note</div>
+        <div className="flex flex-wrap gap-2">
+          {REACTION_OPTIONS.map((emoji) => {
+            const count = m.reactions?.[emoji] ?? 0;
+            const busyKey = `${m.id}:${emoji}`;
+            const busy = !!reactionBusy[busyKey];
+
             return (
-              <div
-                key={m.id}
-                className="absolute group"
-                style={{ left: m.x, top: m.y }}
+              <button
+                key={emoji}
+                type="button"
+                className={`
+                  flex items-center gap-2
+                  px-2.5 py-1.5 rounded-full
+                  border border-slate-700 bg-slate-950/60
+                  hover:border-sky-500/60 hover:bg-slate-950
+                  text-[0.75rem]
+                  disabled:opacity-60
+                `}
+                onClick={() => sendReaction(m.id, emoji)}
+                disabled={busy}
+                title="Add reaction"
               >
-                {/* anchor dot */}
-                <div
-                  className={`w-3 h-3 rounded-full shadow-md group-hover:scale-110 transition-transform ${DOT_STYLES[color]}`}
-                />
-
-                {showFullText && (
-                  <div
-                    className={`
-                      mt-2 max-w-xs rounded-2xl bg-slate-900/95 px-3 py-2 text-xs text-slate-100
-                      shadow-xl backdrop-blur-sm border relative
-                      ${COLOR_STYLES[color]}
-                    `}
-                  >
-                    {/* tail */}
-                    <div className="absolute -top-1 left-3 w-2 h-2 bg-slate-900 border-l border-t border-sky-500/70 rotate-45" />
-
-                    <div className="font-semibold text-[0.75rem] text-sky-300">
-                      {m.author ?? "Anonymous"}
-                    </div>
-                    <div className="mt-1 leading-snug text-[0.78rem]">
-                      {m.text}
-                    </div>
-                    <div className="mt-2 text-[0.65rem] text-slate-400 flex items-center justify-between">
-                      <span>
-                        {new Date(m.createdAt).toLocaleDateString("en-SG", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                      <span>
-                        {new Date(m.createdAt).toLocaleTimeString("en-SG", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+                <span className="text-sm">{emoji}</span>
+                <span className="text-slate-200 tabular-nums">{count}</span>
+              </button>
             );
           })}
         </div>
       </div>
+
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          className="text-[0.7rem] text-slate-400 hover:text-slate-200"
+          onClick={() => setActiveMessageId(null)}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Message overlay */}
@@ -497,9 +703,8 @@ useEffect(() => {
               Leave a note on the Memory Wall
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              This board is a shared space. Add a short, positive message about
-              your memories, experiences, or appreciation. Please keep it
-              respectful and suitable for the NP community.
+              This board is a shared space. Add a short, positive message.
+              Please keep it respectful and suitable for the NP community.
             </p>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -532,10 +737,10 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* style selector */}
+              {/* note category */}
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-2">
-                  Message style (optional)
+                  Message category
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {COLOR_OPTIONS.map((opt) => {
@@ -555,6 +760,33 @@ useEffect(() => {
                         <span
                           className={`w-3 h-3 rounded-full shadow ${dotClass}`}
                         />
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* author “feel” */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-2">
+                  How does this note feel?
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {FEEL_OPTIONS.map((opt) => {
+                    const selected = formFeel === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormFeel(opt.value)}
+                        className={`flex items-center gap-2 px-2 py-1 rounded-full border text-[0.7rem] ${
+                          selected
+                            ? "border-sky-600 bg-sky-50 text-sky-800"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-sky-300"
+                        }`}
+                      >
+                        <span className="text-sm">{opt.value}</span>
                         <span>{opt.label}</span>
                       </button>
                     );
@@ -589,9 +821,8 @@ useEffect(() => {
 
             <div className="mt-4 border-t border-slate-200 pt-3">
               <p className="text-[0.7rem] text-slate-500">
-                How it works: double-click anywhere on the wall to choose a
-                spot, pick a style, and your note will appear at that location.
-                Others can zoom and pan to discover it.
+                How it works: double-click to choose a spot. Your note is pinned
+                to that location. Others can zoom and pan to discover it.
               </p>
             </div>
           </div>
@@ -606,8 +837,7 @@ useEffect(() => {
               Create a new board
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              For example: “NP Memory Wall 2026”, “Open House 2026”, or “Alumni
-              Stories”.
+              For example: “NP Memory Wall 2026”, “Open House 2026”.
             </p>
 
             <form className="space-y-3" onSubmit={handleCreateBoardSubmit}>

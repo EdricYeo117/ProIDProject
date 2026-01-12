@@ -585,7 +585,7 @@ const CommunityCanvas: React.FC = () => {
                   />
 
 {/* card (only one open at a time => no overlap mess) */}
-{showCards && isOpen && (
+{showCards && (
   <div
     className={`mt-2 w-[360px] max-w-[360px] rounded-2xl p-[1px] ${feelFrame}`}
   >
@@ -600,32 +600,40 @@ const CommunityCanvas: React.FC = () => {
     >
       {/* tail */}
       <div className="absolute -top-1 left-3 w-2 h-2 bg-slate-900 border-l border-t border-sky-500/70 rotate-45" />
+<div className="flex items-start justify-between gap-2">
+  {/* LEFT: allow shrink */}
+  <div className="min-w-0">
+    <div className="font-semibold text-[0.8rem] text-sky-300">
+      {m.author ?? "Anonymous"}
+    </div>
 
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="font-semibold text-[0.8rem] text-sky-300">
-            {m.author ?? "Anonymous"}
-          </div>
-          <div className="mt-1 leading-snug text-[0.82rem] break-words">
-            {m.text}
-          </div>
-        </div>
+    <div
+      className="
+        mt-1 leading-snug text-[0.82rem]
+        break-words break-all
+        overflow-hidden
+      "
+      style={{ overflowWrap: "anywhere" }}
+    >
+      {m.text}
+    </div>
+  </div>
 
-        {/* author “feel” */}
-        {m.feel ? (
-          <div
-            className={`
-              shrink-0 w-8 h-8 rounded-full
-              bg-slate-800/70 border border-slate-600
-              flex items-center justify-center text-base
-              ${FEEL_GLOW[m.feel] ?? ""}
-            `}
-            title="Note feel"
-          >
-            {m.feel}
-          </div>
-        ) : null}
-      </div>
+  {/* RIGHT: feel */}
+  {m.feel ? (
+    <div
+      className={`
+        shrink-0 w-8 h-8 rounded-full
+        bg-slate-800/70 border border-slate-600
+        flex items-center justify-center text-base
+        ${FEEL_GLOW[m.feel] ?? ""}
+      `}
+      title="Note feel"
+    >
+      {m.feel}
+    </div>
+  ) : null}
+</div>
 
       <div className="mt-2 text-[0.7rem] text-slate-400 flex items-center justify-between">
         <span>

@@ -1,6 +1,6 @@
 // src/components/hof/HallOfFame.tsx
 import React, { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Users, GraduationCap, Award, Trophy } from "lucide-react";
+import { Users, GraduationCap, Award, Trophy, Handshake } from "lucide-react";
 import type { School, HofCard, PersonDetails } from "./types";
 import { fetchSchools, fetchHof, fetchPerson } from "./HallOfFameAPI";
 import PersonCard from "./PersonCard";
@@ -9,6 +9,7 @@ const segments = [
   { id: "alumni", name: "Distinguished Alumni", icon: GraduationCap },
   { id: "staff", name: "Outstanding Staff", icon: Award },
   { id: "students", name: "Exemplary Students", icon: Trophy },
+  { id: "community", name: "Community Honourees", icon: Handshake }, // new
 ];
 
 const HallOfFame: React.FC = () => {

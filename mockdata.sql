@@ -612,3 +612,41 @@ COMMIT;
 -- JOIN categories c ON p.category_id = c.category_id
 -- ORDER BY s.school_name, c.display_order, p.full_name;
 --------------------------------------------------------------------------------
+------------------------------------------------------------
+-- Seed: 1 Community Honouree (example)
+------------------------------------------------------------
+
+MERGE INTO persons p
+USING (
+  SELECT
+    'community' AS category_id,
+    'infocomm'  AS school_id,          -- or NULL if you want community not tied to a school
+    'Ms. Aisha Lim' AS full_name,
+    'aisha.lim@example.com' AS email,
+    NULL AS graduation_year,
+    NULL AS profile_image_url,
+    'Recognised for sustained contributions to NP student mentorship and community programmes.' AS bio,
+    NULL AS linkedin_url,
+    1 AS is_featured,
+    'active' AS status
+  FROM dual
+) src
+ON (p.full_name = src.full_name AND p.category_id = src.category_id AND NVL(p.school_id,'-') = NVL(src.school_id,'-'))
+WHEN MATCHED THEN UPDATE SET
+  p.email            = src.email,
+  p.profile_image_url= src.profile_image_url,
+  p.bio              = src.bio,
+  p.linkedin_url     = src.linkedin_url,
+  p.is_featured      = src.is_featured,
+  p.status           = src.status,
+  p.updated_at       = CURRENT_TIMESTAMP
+WHEN NOT MATCHED THEN INSERT (
+  person_id, category_id, school_id, full_name, email, graduation_year,
+  profile_image_url, bio, linkedin_url, is_featured, status, created_at, updated_at
+) VALUES (
+  NULL, src.category_id, src.school_id, src.full_name, src.email, src.graduation_year,
+  src.profile_image_url, src.bio, src.linkedin_url, src.is_featured, src.status,
+  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+);
+
+COMMIT;

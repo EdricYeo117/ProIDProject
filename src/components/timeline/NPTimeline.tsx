@@ -101,18 +101,22 @@ function Chip({
   onClick,
   children,
   tone = "blue",
+  gradient,
 }: {
   active?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
   tone?: "blue" | "purple";
+  gradient?: string; // expects: "from-... to-..."
 }) {
-  const activeGrad =
-    tone === "purple"
-      ? "bg-gradient-to-r from-purple-600 to-fuchsia-600 border-purple-400 text-white shadow"
-      : "bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400 text-white shadow";
-  const idle =
-    "bg-slate-800/70 border-slate-600 hover:bg-slate-800/90 hover:border-blue-400/70";
+  const activeClass = gradient
+    ? `bg-gradient-to-r ${gradient} border-white/20 text-white shadow`
+    : tone === "purple"
+    ? "bg-gradient-to-r from-purple-600 to-fuchsia-600 border-purple-400/50 text-white shadow"
+    : "bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400/50 text-white shadow";
+
+  const idleClass =
+    "bg-slate-800/70 border-slate-600 hover:bg-slate-800/90 hover:border-slate-400/70";
 
   return (
     <button
@@ -120,8 +124,11 @@ function Chip({
       aria-pressed={!!active}
       className={[
         "px-3 py-1 rounded-full text-[13px] border transition-colors",
-        "text-blue-100/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:ring-blue-400/50",
-        active ? activeGrad : idle,
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0",
+        tone === "purple"
+          ? "text-purple-100/90 focus-visible:ring-purple-400/50"
+          : "text-blue-100/90 focus-visible:ring-blue-400/50",
+        active ? activeClass : idleClass,
       ].join(" ")}
     >
       {children}
@@ -290,10 +297,48 @@ export default function NPTimeline() {
     ).sort();
   }, [milestones]);
 
-  const allEras = useMemo(() => {
-    return Array.from(
-      new Set(milestones.map((m) => m.era_name).filter(Boolean) as string[])
-    ).sort();
+const allEras = useMemo(() => {
+  // build ranges once from milestones (or keep your existing eraYearRanges memo)
+  const ranges = new Map<string, { min: number; max: number }>();
+
+  milestones.forEach((m) => {
+    const e = (m.era_name ?? "").trim();
+    if (!e) return;
+    const r = ranges.get(e);
+    if (!r) ranges.set(e, { min: m.year, max: m.year });
+    else {
+      r.min = Math.min(r.min, m.year);
+      r.max = Math.max(r.max, m.year);
+    }
+  });
+
+  // unique eras
+  const eras = Array.from(ranges.keys());
+
+  // sort by min year asc (then max asc, then name)
+  eras.sort((a, b) => {
+    const ra = ranges.get(a)!;
+    const rb = ranges.get(b)!;
+    return ra.min - rb.min || ra.max - rb.max || a.localeCompare(b);
+  });
+
+  return eras;
+}, [milestones]);
+
+  // Era year ranges for labels
+  const eraYearRanges = useMemo(() => {
+    const ranges = new Map<string, { min: number; max: number }>();
+    milestones.forEach((m) => {
+      if (!m.era_name) return;
+      const existing = ranges.get(m.era_name);
+      if (!existing) {
+        ranges.set(m.era_name, { min: m.year, max: m.year });
+      } else {
+        existing.min = Math.min(existing.min, m.year);
+        existing.max = Math.max(existing.max, m.year);
+      }
+    });
+    return ranges;
   }, [milestones]);
 
   // Apply filters
@@ -357,19 +402,6 @@ export default function NPTimeline() {
     );
   }
 
-  if (!grouped.length) {
-    return (
-      <div className="min-h-screen bg-slate-900 text-blue-200 grid place-items-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2">
-            No milestones match your filters
-          </h2>
-          <p>Clear filters or insert more data.</p>
-        </div>
-      </div>
-    );
-  }
-
   /* helpers for chips */
   const toggleSet = (
     setter: React.Dispatch<React.SetStateAction<Set<string>>>,
@@ -385,6 +417,11 @@ export default function NPTimeline() {
 
   /* era de-dup for the vertical spine */
   let lastEraShown = ""; // updated while rendering rows
+
+  // Helpers to track number of filtered items
+  const hasAnyData = milestones.length > 0;
+  const hasResults = grouped.length > 0;
+  const hasActiveFilters = categoryFilter.size > 0 || eraFilter.size > 0;
 
   return (
     <div
@@ -419,6 +456,7 @@ export default function NPTimeline() {
                         key={c}
                         active={categoryFilter.has(c)}
                         onClick={() => toggleSet(setCategoryFilter, c)}
+                        gradient={categoryColors[c]} // ✅ THIS is what makes Foundation orange
                       >
                         {c}
                       </Chip>
@@ -439,16 +477,23 @@ export default function NPTimeline() {
                     >
                       All
                     </Chip>
-                    {allEras.map((e) => (
-                      <Chip
-                        key={e}
-                        tone="purple"
-                        active={eraFilter.has(e)}
-                        onClick={() => toggleSet(setEraFilter, e)}
-                      >
-                        {e}
-                      </Chip>
-                    ))}
+                    {allEras.map((e) => {
+                      const range = eraYearRanges.get(e);
+                      const label = range
+                        ? `${e} (${range.min} - ${range.max})`
+                        : e;
+
+                      return (
+                        <Chip
+                          key={e}
+                          tone="purple"
+                          active={eraFilter.has(e)}
+                          onClick={() => toggleSet(setEraFilter, e)}
+                        >
+                          {label}
+                        </Chip>
+                      );
+                    })}
 
                     {/* Clear button */}
                     {(categoryFilter.size > 0 || eraFilter.size > 0) && (
@@ -471,101 +516,131 @@ export default function NPTimeline() {
 
           {/* ── Timeline ──────────────────────────────────────────────── */}
 
-          <div
-            className="relative"
-            style={{ marginTop: trayH + eraH + ERA_CLEARANCE_PX }}
-          >
-            {/* vertical spine */}
-            <div
-              className="absolute left-1/2 top-0 bottom-0 w-[2px] z-0
-                bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2"
-            />
-            <div className="space-y-28 md:space-y-32">
-              {grouped.map(([year, items], idx) => {
-                const isLeft = idx % 2 === 0;
-                const era = (items[0]?.era_name || "").trim();
-                const showEra = era && era !== lastEraShown;
-                if (showEra) lastEraShown = era;
+{/* ── Timeline / Empty state ──────────────────────────────────────────────── */}
+<div
+  className="relative"
+  style={{ marginTop: trayH + eraH + ERA_CLEARANCE_PX }}
+>
+  {hasResults ? (
+    <>
+      {/* vertical spine */}
+      <div
+        className="absolute left-1/2 top-0 bottom-0 w-[2px] z-0
+          bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2"
+      />
 
-                return (
-                  <div key={year} className="relative">
-                    <div className="flex items-start justify-center">
-                      {/* LEFT column */}
-                      <div
-                        className={cx(
-                          "w-[44%]",
-                          isLeft ? "pr-12" : "invisible"
-                        )}
-                      >
-                        {isLeft && (
-                          <>
-                            {/* Big year */}
-                            <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
-                              {year}
-                            </div>
+      <div className="space-y-28 md:space-y-32">
+        {grouped.map(([year, items], idx) => {
+          const isLeft = idx % 2 === 0;
+          const era = (items[0]?.era_name || "").trim();
+          const showEra = era && era !== lastEraShown;
+          if (showEra) lastEraShown = era;
 
-                            <div className="space-y-4">
-                              {items.map((m) => (
-                                <EventCard
-                                  key={m.id}
-                                  milestone={m}
-                                  side="left"
-                                  onClick={() => setSelectedMilestone(m)}
-                                />
-                              ))}
-                            </div>
-                          </>
-                        )}
+          return (
+            <div key={year} className="relative">
+              <div className="flex items-start justify-center">
+                {/* LEFT column */}
+                <div className={cx("w-[44%]", isLeft ? "pr-12" : "invisible")}>
+                  {isLeft && (
+                    <>
+                      <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
+                        {year}
                       </div>
 
-                      {/* Center: optional era tag (de-duplicated) + dot */}
-                      <div className="relative z-0 flex-shrink-0">
-                        {" "}
-                        {/* was z-20 */}
-                        {showEra && (
-                          <div
-                            ref={idx === 0 ? firstEraRef : undefined}
-                            className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
-                          >
-                            <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
-                              {era}
-                            </div>
-                          </div>
-                        )}
-                        <div className="w-9 h-9 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
+                      <div className="space-y-4">
+                        {items.map((m) => (
+                          <EventCard
+                            key={m.id}
+                            milestone={m}
+                            side="left"
+                            onClick={() => setSelectedMilestone(m)}
+                          />
+                        ))}
                       </div>
+                    </>
+                  )}
+                </div>
 
-                      {/* RIGHT column */}
-                      <div
-                        className={cx(
-                          "w-[44%]",
-                          !isLeft ? "pl-12" : "invisible"
-                        )}
-                      >
-                        {!isLeft && (
-                          <>
-                            <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
-                              {year}
-                            </div>
-                            <div className="space-y-4">
-                              {items.map((m) => (
-                                <EventCard
-                                  key={m.id}
-                                  milestone={m}
-                                  side="right"
-                                  onClick={() => setSelectedMilestone(m)}
-                                />
-                              ))}
-                            </div>
-                          </>
-                        )}
+                {/* Center */}
+                <div className="relative z-0 flex-shrink-0">
+                  {showEra && (
+                    <div
+                      ref={idx === 0 ? firstEraRef : undefined}
+                      className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
+                    >
+                      <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
+                        {era}
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                  <div className="w-9 h-9 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
+                </div>
+
+                {/* RIGHT column */}
+                <div className={cx("w-[44%]", !isLeft ? "pl-12" : "invisible")}>
+                  {!isLeft && (
+                    <>
+                      <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
+                        {year}
+                      </div>
+                      <div className="space-y-4">
+                        {items.map((m) => (
+                          <EventCard
+                            key={m.id}
+                            milestone={m}
+                            side="right"
+                            onClick={() => setSelectedMilestone(m)}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          );
+        })}
+      </div>
+    </>
+  ) : (
+    <div className="grid place-items-center py-24">
+      <div className="max-w-xl w-full rounded-2xl border border-slate-700/60 bg-slate-900/70 backdrop-blur px-6 py-8 text-center shadow-xl">
+        <h2 className="text-xl font-semibold text-white mb-2">
+          {hasAnyData
+            ? "No milestones match your filters"
+            : "No milestones available yet"}
+        </h2>
+
+        <p className="text-sm text-slate-300 mb-6">
+          {hasAnyData
+            ? "Adjust the Category/Era filters, or clear them to see all milestones."
+            : "Insert milestone data to populate the timeline."}
+        </p>
+
+        <div className="flex items-center justify-center gap-3">
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setCategoryFilter(new Set());
+                setEraFilter(new Set());
+              }}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow"
+            >
+              Clear filters
+            </button>
+          )}
+
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="px-4 py-2 rounded-xl border border-slate-600 text-slate-200 hover:border-slate-400 hover:bg-slate-800/50"
+          >
+            Back to filters
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
           <div className="h-24" />
         </div>
@@ -647,61 +722,66 @@ export default function NPTimeline() {
                   <p className="text-slate-300 leading-relaxed mb-6">
                     {selectedMilestone.description}
                   </p>
-{(() => {
-  const yearStr = String(selectedMilestone.year);
+                  {(() => {
+                    const yearStr = String(selectedMilestone.year);
 
-  // ✅ Only show QR + link if an info page exists in the registry
-  const hasInfo = !!timelineInfoLoaders[yearStr];
-  if (!hasInfo) return null;
+                    // ✅ Only show QR + link if an info page exists in the registry
+                    const hasInfo = !!timelineInfoLoaders[yearStr];
+                    if (!hasInfo) return null;
 
-  const infoPath = `/timeline/${yearStr}/info`;
+                    const infoPath = `/timeline/${yearStr}/info`;
 
-  // Use a public base URL if you want phone scanning to work on LAN
-  // e.g. VITE_PUBLIC_BASE_URL=http://192.168.1.23:5173
-  const base = (import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin)
-    .toString()
-    .replace(/\/+$/, "");
+                    // Use a public base URL if you want phone scanning to work on LAN
+                    // e.g. VITE_PUBLIC_BASE_URL=http://192.168.1.23:5173
+                    const base = (
+                      import.meta.env.VITE_PUBLIC_BASE_URL ||
+                      window.location.origin
+                    )
+                      .toString()
+                      .replace(/\/+$/, "");
 
-  const infoUrl = `${base}${infoPath}`;
+                    const infoUrl = `${base}${infoPath}`;
 
-  return (
-    <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-      <div className="min-w-0">
-        <div className="text-sm font-semibold text-white">More information</div>
-        <div className="text-xs text-slate-300">
-          Scan or click the QR code to open the full page.
-        </div>
-        <div className="mt-1 text-[11px] font-mono text-slate-400 break-all">
-          {infoPath}
-        </div>
+                    return (
+                      <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white">
+                            More information
+                          </div>
+                          <div className="text-xs text-slate-300">
+                            Scan or click the QR code to open the full page.
+                          </div>
+                          <div className="mt-1 text-[11px] font-mono text-slate-400 break-all">
+                            {infoPath}
+                          </div>
 
-        <Link
-          to={infoPath}
-          className="mt-2 inline-block text-xs text-blue-300 hover:text-blue-200 underline underline-offset-2"
-        >
-          Open details page
-        </Link>
-      </div>
+                          <Link
+                            to={infoPath}
+                            className="mt-2 inline-block text-xs text-blue-300 hover:text-blue-200 underline underline-offset-2"
+                          >
+                            Open details page
+                          </Link>
+                        </div>
 
-      {/* Clickable QR */}
-      <Link
-        to={infoPath}
-        className="shrink-0 rounded-lg bg-white p-2 shadow-sm hover:opacity-95"
-        aria-label={`Open ${yearStr} info page`}
-        title="Open details page"
-      >
-        <QRCode value={infoUrl} size={84} />
-      </Link>
-    </div>
-  );
-})()}
+                        {/* Clickable QR */}
+                        <Link
+                          to={infoPath}
+                          className="shrink-0 rounded-lg bg-white p-2 shadow-sm hover:opacity-95"
+                          aria-label={`Open ${yearStr} info page`}
+                          title="Open details page"
+                        >
+                          <QRCode value={infoUrl} size={84} />
+                        </Link>
+                      </div>
+                    );
+                  })()}
 
-<button
-  onClick={() => setSelectedMilestone(null)}
-  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-lg"
->
-  Close
-</button>
+                  <button
+                    onClick={() => setSelectedMilestone(null)}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-lg"
+                  >
+                    Close
+                  </button>
                 </>
               );
             })()}

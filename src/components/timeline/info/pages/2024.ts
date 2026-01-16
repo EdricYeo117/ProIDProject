@@ -1,7 +1,7 @@
-import type { TimelineInfo } from "./types";
+import type { TimelineInfo } from "../types";
 
-const info: TimelineInfo = {
-  year: "2023",
+const info2023: TimelineInfo = {
+  year: 2024,
   tag: "Innovation",
   title: "NP2030, Autonomous Shuttle, and Industry-in-Curriculum",
   longText: `As part of NP’s 60th anniversary, the Polytechnic announced its 5th Strategic Plan, or NP2030, which shares the Polytechnic’s vision and outlines its priorities and strategies for a shared and sustainable future.
@@ -18,6 +18,15 @@ NP and Yinson GreenTech jointly unveiled green technology infrastructure on NP's
     "https://www.np.edu.sg/about-np/our-story",
     "https://en.wikipedia.org/wiki/Ngee_Ann_Polytechnic",
   ],
+
+  media: [
+    {
+      type: "image",
+      src: "https://objectstorage.ap-singapore-1.oraclecloud.com/p/iUHTCWD27nbmiGc0d6XKYwEwRe-0sEdTdtnm37I8eX0JCIQ5ZOxFq8Imj_MlY8sh/n/axbiq8cyf7xv/b/np-hof/o/2024_Milestone.jpg",
+      alt: "2024 milestone image",
+      caption: "2024 milestone visual.",
+    },
+  ],
 };
 
-export default info;
+export default info2023;

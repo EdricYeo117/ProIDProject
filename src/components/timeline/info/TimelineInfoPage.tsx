@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  memo,
+} from "react";
 import { Link, useParams } from "react-router-dom";
 import type { TimelineInfo } from "./types";
 import { timelineInfoLoaders } from "./registry";
@@ -22,7 +29,6 @@ function parseLongTextToBlocks(longText: string): Block[] {
   while (i < chunks.length) {
     const chunk = chunks[i];
 
-    // Exact heading chunk, e.g. "Background:"
     const headingMatch = chunk.match(/^([A-Za-z][A-Za-z\s]+):$/);
     if (headingMatch) {
       blocks.push({ type: "heading", text: headingMatch[1] });
@@ -30,7 +36,6 @@ function parseLongTextToBlocks(longText: string): Block[] {
       continue;
     }
 
-    // Heading + numbered list in next chunk
     const maybeHeading = chunk.match(/^(.+):$/);
     const next = chunks[i + 1] ?? "";
     const nextHasNumbered = next
@@ -51,7 +56,6 @@ function parseLongTextToBlocks(longText: string): Block[] {
       continue;
     }
 
-    // Pure numbered list chunk
     const lines = chunk
       .split("\n")
       .map((l) => l.trim())
@@ -69,7 +73,6 @@ function parseLongTextToBlocks(longText: string): Block[] {
       continue;
     }
 
-    // Normal paragraph
     blocks.push({ type: "paragraph", text: chunk });
     i += 1;
   }
@@ -77,32 +80,279 @@ function parseLongTextToBlocks(longText: string): Block[] {
   return blocks;
 }
 
-function ParagraphBox({
-  children,
-  tone = "default",
-}: {
-  children: React.ReactNode;
-  tone?: "default" | "soft";
-}) {
-  const base =
-    tone === "soft"
-      ? "border-indigo-500/10 bg-slate-900/35"
-      : "border-indigo-500/15 bg-slate-950/25";
+const ParagraphBox = memo(
+  ({
+    children,
+    tone = "default",
+  }: {
+    children: React.ReactNode;
+    tone?: "default" | "soft";
+  }) => {
+    const className =
+      tone === "soft"
+        ? "rounded-2xl border border-indigo-500/10 bg-slate-900/35 backdrop-blur p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+        : "rounded-2xl border border-indigo-500/15 bg-slate-950/25 backdrop-blur p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.25)]";
+
+    return <div className={className}>{children}</div>;
+  }
+);
+
+ParagraphBox.displayName = "ParagraphBox";
+
+/* ─────────────────────────── Media Components ─────────────────────────── */
+
+const FRAME_CLASS =
+  "w-full max-w-4xl mx-auto rounded-2xl overflow-hidden border border-indigo-500/20 bg-slate-950/40 shadow-xl";
+const RATIO_CLASS = "aspect-[16/9]";
+
+const MediaImage = memo(
+  ({
+    src,
+    alt,
+    caption,
+  }: {
+    src: string;
+    alt?: string;
+    caption?: string;
+  }) => (
+    <div className="space-y-3">
+      <div className={FRAME_CLASS}>
+        <div className={`relative ${RATIO_CLASS}`}>
+          <div className="absolute inset-0 ring-1 ring-white/5 pointer-events-none" />
+          <img
+            src={src}
+            alt={alt ?? ""}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-contain bg-black"
+          />
+        </div>
+      </div>
+      {caption && (
+        <div className="max-w-4xl mx-auto text-sm text-slate-400 italic">
+          {caption}
+        </div>
+      )}
+    </div>
+  )
+);
+
+MediaImage.displayName = "MediaImage";
+
+const MediaVideo = memo(
+  ({
+    src,
+    poster,
+    caption,
+  }: {
+    src: string;
+    poster?: string;
+    caption?: string;
+  }) => (
+    <div className="space-y-3">
+      <div className={FRAME_CLASS}>
+        <div className={`relative ${RATIO_CLASS}`}>
+          <div className="absolute inset-0 ring-1 ring-white/5 pointer-events-none" />
+          <video
+            controls
+            preload="metadata"
+            poster={poster}
+            className="absolute inset-0 w-full h-full object-contain bg-black"
+          >
+            <source src={src} />
+          </video>
+        </div>
+      </div>
+      {caption && (
+        <div className="max-w-4xl mx-auto text-sm text-slate-400 italic">
+          {caption}
+        </div>
+      )}
+    </div>
+  )
+);
+
+MediaVideo.displayName = "MediaVideo";
+
+const MediaAudio = memo(
+  ({ src, caption }: { src: string; caption?: string }) => (
+    <div className="space-y-2">
+      <div className={`${FRAME_CLASS} p-4`}>
+        <audio controls className="w-full">
+          <source src={src} />
+        </audio>
+      </div>
+      {caption && (
+        <div className="max-w-4xl mx-auto text-sm text-slate-400 italic">
+          {caption}
+        </div>
+      )}
+    </div>
+  )
+);
+
+MediaAudio.displayName = "MediaAudio";
+
+const MediaSection = memo(({ media }: { media?: TimelineInfo["media"] }) => {
+  if (!media || media.length === 0) return null;
 
   return (
-    <div
-      className={[
-        "rounded-2xl border backdrop-blur p-5 sm:p-6",
-        "shadow-[0_10px_30px_rgba(0,0,0,0.25)]",
-        base,
-      ].join(" ")}
-    >
-      {children}
+    <div className="mt-10 space-y-10">
+      {media.map((m, idx) => {
+        const key = `media-${idx}`;
+        if (m.type === "image") {
+          return (
+            <MediaImage
+              key={key}
+              src={m.src}
+              alt={m.alt}
+              caption={m.caption}
+            />
+          );
+        }
+        if (m.type === "video") {
+          return (
+            <MediaVideo
+              key={key}
+              src={m.src}
+              poster={m.poster}
+              caption={m.caption}
+            />
+          );
+        }
+        if (m.type === "audio") {
+          return <MediaAudio key={key} src={m.src} caption={m.caption} />;
+        }
+        return null;
+      })}
     </div>
   );
-}
+});
 
-/* ─────────────────────────── Page ─────────────────────────── */
+MediaSection.displayName = "MediaSection";
+
+/* ─────────────────────────── Background Component ─────────────────────────── */
+
+const AnimatedBackground = memo(() => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
+    <div
+      className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse"
+      style={{ animationDelay: "1s" }}
+    />
+    <div
+      className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl animate-pulse"
+      style={{ animationDelay: "2s" }}
+    />
+  </div>
+));
+
+AnimatedBackground.displayName = "AnimatedBackground";
+
+/* ─────────────────────────── Loading State ─────────────────────────── */
+
+const LoadingState = () => (
+  <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative overflow-hidden">
+    <AnimatedBackground />
+    <div className="relative pt-24 md:pt-28 px-6 sm:px-12 pb-20">
+      <div className="max-w-5xl mx-auto">
+        <div className="rounded-3xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-xl shadow-2xl overflow-hidden p-8 sm:p-10">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 rounded-full border-2 border-indigo-300 border-t-transparent animate-spin" />
+            <div className="text-indigo-200 font-medium">Loading details…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+/* ─────────────────────────── Not Found State ─────────────────────────── */
+
+const NotFoundState = ({ year }: { year?: string }) => (
+  <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative overflow-hidden">
+    <AnimatedBackground />
+    <div className="relative pt-24 md:pt-28 px-6 sm:px-12 pb-20">
+      <div className="max-w-5xl mx-auto">
+        <div className="rounded-3xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-xl shadow-2xl overflow-hidden p-8 sm:p-10">
+          <div className="text-2xl font-bold mb-2">Info not found</div>
+          <div className="text-slate-300 mb-6">
+            No content is registered for{" "}
+            <span className="font-mono text-slate-200">{year}</span>.
+          </div>
+          <Link
+            to="/timeline"
+            className="inline-flex justify-center items-center gap-2 rounded-xl border border-indigo-500/30 bg-slate-900/60 backdrop-blur px-6 py-3 text-indigo-200 hover:border-indigo-400/60 hover:bg-slate-800/60 hover:text-white transition-all font-medium"
+          >
+            <span>←</span>
+            <span>Back to timeline</span>
+          </Link>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+/* ─────────────────────────── Content Blocks ─────────────────────────── */
+
+const BlockHeading = memo(({ text }: { text: string }) => (
+  <div className="pt-2">
+    <div className="flex items-center gap-3 mb-2">
+      <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
+      <div className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-purple-200 uppercase tracking-wider">
+        {text}
+      </div>
+    </div>
+  </div>
+));
+BlockHeading.displayName = "BlockHeading";
+
+const BlockList = memo(({ items }: { items: string[] }) => (
+  <ParagraphBox tone="soft">
+    <div className="text-slate-100 text-base sm:text-lg font-semibold mb-3">
+      Key points
+    </div>
+    <ol className="list-decimal pl-5 space-y-2 text-slate-200 leading-relaxed text-base sm:text-lg">
+      {items.map((item, i) => (
+        <li key={i} className="marker:text-indigo-300">
+          {item}
+        </li>
+      ))}
+    </ol>
+  </ParagraphBox>
+));
+BlockList.displayName = "BlockList";
+
+const BlockParagraph = memo(({ text }: { text: string }) => (
+  <ParagraphBox>
+    <p className="text-slate-200 leading-relaxed text-base sm:text-lg">{text}</p>
+  </ParagraphBox>
+));
+BlockParagraph.displayName = "BlockParagraph";
+
+/* ─────────────────────────── Sources Section ─────────────────────────── */
+
+const SourceLink = memo(
+  ({ source, index }: { source: string; index: number }) => (
+    <li className="group">
+      <a
+        href={source}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-start gap-3 text-sm text-indigo-300 hover:text-indigo-200 transition-colors p-3 rounded-xl hover:bg-indigo-950/30"
+      >
+        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-300 group-hover:bg-indigo-500/30 transition-colors">
+          {index + 1}
+        </span>
+        <span className="break-all underline underline-offset-4 decoration-indigo-500/30 group-hover:decoration-indigo-400/60">
+          {source}
+        </span>
+      </a>
+    </li>
+  )
+);
+SourceLink.displayName = "SourceLink";
+
+/* ─────────────────────────── Main Page Component ─────────────────────────── */
 
 export default function TimelineInfoPage() {
   const { year } = useParams();
@@ -111,6 +361,18 @@ export default function TimelineInfoPage() {
     "loading"
   );
   const [copied, setCopied] = useState(false);
+
+  // Fix: correct timer lifecycle for “Copied!”
+  const copiedTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+        copiedTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,102 +407,33 @@ export default function TimelineInfoPage() {
     };
   }, [year]);
 
-  const infoPath = useMemo(() => {
-    if (!year) return "/timeline";
-    return `/timeline/${year}/info`;
-  }, [year]);
+  const blocks = useMemo(
+    () => (info ? parseLongTextToBlocks(info.longText) : []),
+    [info]
+  );
 
-  const handleCopyLink = () => {
+  const handleCopyLink = useCallback(() => {
     const url = window.location.href;
     navigator.clipboard?.writeText(url).catch(() => {});
+
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  };
 
-  // Loading state (styled)
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
-          <div
-            className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse"
-            style={{ animationDelay: "1s" }}
-          />
-          <div
-            className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl animate-pulse"
-            style={{ animationDelay: "2s" }}
-          />
-        </div>
+    if (copiedTimerRef.current !== null) {
+      window.clearTimeout(copiedTimerRef.current);
+    }
 
-        <div className="relative pt-24 md:pt-28 px-6 sm:px-12 pb-20">
-          <div className="max-w-5xl mx-auto">
-            <div className="rounded-3xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-xl shadow-2xl overflow-hidden p-8 sm:p-10">
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full border-2 border-indigo-300 border-t-transparent animate-spin" />
-                <div className="text-indigo-200 font-medium">
-                  Loading details…
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    copiedTimerRef.current = window.setTimeout(() => {
+      setCopied(false);
+      copiedTimerRef.current = null;
+    }, 2000);
+  }, []);
 
-  // Not found state (styled)
-  if (status === "notfound" || !info) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
-          <div
-            className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse"
-            style={{ animationDelay: "1s" }}
-          />
-        </div>
-
-        <div className="relative pt-24 md:pt-28 px-6 sm:px-12 pb-20">
-          <div className="max-w-5xl mx-auto">
-            <div className="rounded-3xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-xl shadow-2xl overflow-hidden p-8 sm:p-10">
-              <div className="text-2xl font-bold mb-2">Info not found</div>
-              <div className="text-slate-300 mb-6">
-                No content is registered for{" "}
-                <span className="font-mono text-slate-200">{year}</span>.
-              </div>
-
-              <Link
-                to="/timeline"
-                className="inline-flex justify-center items-center gap-2 rounded-xl border border-indigo-500/30 bg-slate-900/60 backdrop-blur px-6 py-3 text-indigo-200 hover:border-indigo-400/60 hover:bg-slate-800/60 hover:text-white transition-all font-medium"
-              >
-                <span>←</span>
-                <span>Back to timeline</span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Ready state
-  const blocks = parseLongTextToBlocks(info.longText);
+  if (status === "loading") return <LoadingState />;
+  if (status === "notfound" || !info) return <NotFoundState year={year} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
-        <div
-          className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "1s" }}
-        />
-        <div
-          className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "2s" }}
-        />
-      </div>
+      <AnimatedBackground />
 
       <div className="relative pt-24 md:pt-28 px-6 sm:px-12 pb-20">
         <div className="max-w-5xl mx-auto">
@@ -259,15 +452,13 @@ export default function TimelineInfoPage() {
 
           {/* Main content card */}
           <div className="rounded-3xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-xl shadow-2xl overflow-hidden hover:border-indigo-500/30 transition-colors">
-            {/* Header with gradient overlay */}
+            {/* Header */}
             <div className="relative p-8 sm:p-10 border-b border-indigo-500/10 bg-gradient-to-br from-indigo-950/80 via-slate-900/80 to-purple-950/80">
-              {/* Decorative corner accents */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/5 to-transparent rounded-bl-full" />
               <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-purple-500/5 to-transparent rounded-tr-full" />
 
               <div className="relative flex flex-col gap-4">
                 <div className="flex items-center gap-4 flex-wrap">
-                  {/* Year badge with glow effect */}
                   <div className="relative">
                     <div className="absolute inset-0 bg-amber-400/30 blur-xl rounded-2xl" />
                     <div className="relative text-5xl sm:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 drop-shadow-lg">
@@ -275,11 +466,11 @@ export default function TimelineInfoPage() {
                     </div>
                   </div>
 
-                  {info.tag ? (
+                  {info.tag && (
                     <span className="relative text-xs font-bold px-4 py-1.5 rounded-full bg-gradient-to-r from-indigo-600/40 to-purple-600/40 border border-indigo-400/30 text-indigo-200 backdrop-blur-sm shadow-lg">
                       {info.tag}
                     </span>
-                  ) : null}
+                  )}
                 </div>
 
                 <h1 className="text-3xl sm:text-4xl font-bold leading-tight text-white drop-shadow-md">
@@ -290,51 +481,21 @@ export default function TimelineInfoPage() {
 
             {/* Content section */}
             <div className="p-8 sm:p-10">
-              {/* Boxed sections */}
-              <div className="space-y-4">
+              <MediaSection media={info.media} />
+
+              {/* Content blocks */}
+              <div className="space-y-4 mt-10">
                 {blocks.map((b, idx) => {
-                  if (b.type === "heading") {
-                    return (
-                      <div key={`${b.type}-${idx}`} className="pt-2">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
-                          <div className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-purple-200 uppercase tracking-wider">
-                            {b.text}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (b.type === "list") {
-                    return (
-                      <ParagraphBox key={`${b.type}-${idx}`} tone="soft">
-                        <div className="text-slate-100 text-base sm:text-lg font-semibold mb-3">
-                          Key points
-                        </div>
-                        <ol className="list-decimal pl-5 space-y-2 text-slate-200 leading-relaxed text-base sm:text-lg">
-                          {b.items.map((item, i) => (
-                            <li key={i} className="marker:text-indigo-300">
-                              {item}
-                            </li>
-                          ))}
-                        </ol>
-                      </ParagraphBox>
-                    );
-                  }
-
-                  // paragraph
-                  return (
-                    <ParagraphBox key={`${b.type}-${idx}`}>
-                      <p className="text-slate-200 leading-relaxed text-base sm:text-lg">
-                        {b.text}
-                      </p>
-                    </ParagraphBox>
-                  );
+                  const key = `${b.type}-${idx}`;
+                  if (b.type === "heading")
+                    return <BlockHeading key={key} text={b.text} />;
+                  if (b.type === "list")
+                    return <BlockList key={key} items={b.items} />;
+                  return <BlockParagraph key={key} text={b.text} />;
                 })}
               </div>
 
-              {/* Sources section */}
+              {/* Sources */}
               <div className="mt-12 pt-8 border-t border-indigo-500/10">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
@@ -345,21 +506,7 @@ export default function TimelineInfoPage() {
 
                 <ul className="space-y-3">
                   {info.sources.map((s, idx) => (
-                    <li key={s} className="group">
-                      <a
-                        href={s}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-start gap-3 text-sm text-indigo-300 hover:text-indigo-200 transition-colors p-3 rounded-xl hover:bg-indigo-950/30"
-                      >
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-300 group-hover:bg-indigo-500/30 transition-colors">
-                          {idx + 1}
-                        </span>
-                        <span className="break-all underline underline-offset-4 decoration-indigo-500/30 group-hover:decoration-indigo-400/60">
-                          {s}
-                        </span>
-                      </a>
-                    </li>
+                    <SourceLink key={s} source={s} index={idx} />
                   ))}
                 </ul>
               </div>
@@ -415,9 +562,6 @@ export default function TimelineInfoPage() {
                   )}
                 </button>
               </div>
-
-              {/* Unused but kept for clarity if you later want to show the current path */}
-              <div className="sr-only">{infoPath}</div>
             </div>
           </div>
 

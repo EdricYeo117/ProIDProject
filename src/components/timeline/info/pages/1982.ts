@@ -1,7 +1,7 @@
-import type { TimelineInfo } from "./types";
+import type { TimelineInfo } from "../types";
 
-const info: TimelineInfo = {
-  year: "1982",
+const info1982: TimelineInfo = {
+  year: 1982,
   tag: "Milestone",
   title: "Renamed Ngee Ann Polytechnic and Major Expansion",
   longText: `Ngee Ann Technical College was formally renamed Ngee Ann Polytechnic on 19 March 1982, as announced by the Minister-in-charge of the Polytechnic, Dr Tay Eng Soon. During the press conference, the Minister also announced NP’s second five-year expansion plan. A model of the expanded campus and its new buildings was displayed, showcasing new classroom, workshop and laboratory blocks, office cum teaching blocks, lecture theatres, a student activities centre, Administration cum Library Block and canteens. These were approved by the Government under the main building project in 1981, as well as the three proposed staff accommodation blocks and the proposed Sports Complex.
@@ -16,6 +16,16 @@ The Works and Buildings and the Furniture and Equipment components of the physic
     "https://en.wikipedia.org/wiki/Ngee_Ann_Polytechnic",
     "https://www.nlb.gov.sg/main/book-detail?cmsuuid=f5509861-f66d-482f-af74-90db5aa2b3c7",
   ],
+
+  // NEW
+  media: [
+    {
+      type: "image",
+      src: "https://objectstorage.ap-singapore-1.oraclecloud.com/p/iUHTCWD27nbmiGc0d6XKYwEwRe-0sEdTdtnm37I8eX0JCIQ5ZOxFq8Imj_MlY8sh/n/axbiq8cyf7xv/b/np-hof/o/1982_Milestone.png",
+      alt: "1982 milestone image",
+      caption: "1982 milestone visual.",
+    },
+  ],
 };
 
-export default info;
+export default info1982;

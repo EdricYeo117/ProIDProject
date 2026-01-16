@@ -1,7 +1,7 @@
 import type { TimelineInfo } from "../types";
 
 const info1963: TimelineInfo = {
-  year: "1963",
+  year: 1963,
   title: "Ngee Ann College Inaugurated",
   tag: "Foundation",
   longText: `Founded in 1963 as the Ngee Ann College by the Ngee Ann Kongsi, Ngee Ann Polytechnic opened with 116 students and offered courses in language, commerce and technology. (Ngee Ann Polytechnic, n.d.) It was established at the newly-built Teochew Building at Tank Road with Professor Liu Yin Soon as its first principal.
@@ -23,6 +23,16 @@ The College had an initial number of 36 members on the teaching staff, comprisin
     "https://www.np.edu.sg/about-np/our-story",
     "https://en.wikipedia.org/wiki/Ngee_Ann_Polytechnic",
     "https://www.nlb.gov.sg/main/book-detail?cmsuuid=f5509861-f66d-482f-af74-90db5aa2b3c7",
+  ],
+
+  // NEW
+  media: [
+    {
+      type: "image",
+      src: "https://objectstorage.ap-singapore-1.oraclecloud.com/p/iUHTCWD27nbmiGc0d6XKYwEwRe-0sEdTdtnm37I8eX0JCIQ5ZOxFq8Imj_MlY8sh/n/axbiq8cyf7xv/b/np-hof/o/1963_Milestone.png",
+      alt: "1963 milestone image",
+      caption: "1963 milestone visual.",
+    },
   ],
 };
 

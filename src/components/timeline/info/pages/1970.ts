@@ -1,7 +1,7 @@
 import type { TimelineInfo } from "../types";
 
 const info1970: TimelineInfo = {
-  year: "1970",
+  year: 1970,
   title: "Shift to Technical Education Focus",
   tag: "Reorganisation",
   longText: `In 1970, the departments of Business Administration, Accountancy, Applied Chemistry, Telecommunications Engineering, Home Economics and part-time courses in Chinese Literature and Accountancy were discontinued. The last batch of 105 degree students under the old system sat for their graduation examination and left the college in 1970.
@@ -19,6 +19,16 @@ In addition to the physical changes to the college, the plan also included a sta
     "https://www.np.edu.sg/about-np/our-story",
     "https://en.wikipedia.org/wiki/Ngee_Ann_Polytechnic",
     "https://www.nlb.gov.sg/main/book-detail?cmsuuid=f5509861-f66d-482f-af74-90db5aa2b3c7",
+  ],
+
+  // NEW
+  media: [
+    {
+      type: "image",
+      src: "https://objectstorage.ap-singapore-1.oraclecloud.com/p/iUHTCWD27nbmiGc0d6XKYwEwRe-0sEdTdtnm37I8eX0JCIQ5ZOxFq8Imj_MlY8sh/n/axbiq8cyf7xv/b/np-hof/o/1970_Milestone.jpg",
+      alt: "1970 milestone image",
+      caption: "1970 milestone visual.",
+    },
   ],
 };
 

@@ -102,16 +102,37 @@ const HallOfFame: React.FC = () => {
     }
   };
 
+  function pickTextColor(bg?: string) {
+    if (!bg) return "#ffffff";
+    const hex = bg.replace("#", "").trim();
+    const full =
+      hex.length === 3
+        ? hex
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : hex;
+    if (full.length !== 6) return "#ffffff";
+
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+
+    // perceived luminance
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return lum > 0.6 ? "#111111" : "#ffffff";
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#003D5C] to-[#005580]">
       {/* Header */}
       <header className="bg-white shadow-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-6 md:py-8">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
               Ngee Ann Polytechnic
             </span>
-            <h1 className="mt-1 text-3xl font-extrabold text-[#003D5C]">
+            <h1 className="mt-1 text-2xl md:text-3xl font-extrabold text-[#003D5C]">
               Hall of Fame
             </h1>
             <p className="mt-1 text-sm text-slate-600 max-w-xl">
@@ -132,49 +153,61 @@ const HallOfFame: React.FC = () => {
       {/* Tabs */}
       <div className="border-b-4 border-[#FFB81C] bg-white">
         <nav
-          className="mx-auto flex max-w-6xl divide-x divide-slate-100"
+          className="mx-auto max-w-6xl px-0"
           aria-label="Achievement categories"
         >
-          {segments.map((segment) => {
-            const Icon = segment.icon;
-            const active = activeSegment === segment.id;
-            return (
-              <button
-                type="button"
-                key={`seg-${segment.id}`}
-                className={[
-                  "flex flex-1 items-center justify-center gap-2 px-4 py-4 text-sm font-bold uppercase tracking-wide transition-colors",
-                  active
-                    ? "bg-[#003D5C] text-white border-b-4 border-b-[#FFB81C]"
-                    : "bg-transparent text-[#003D5C] hover:bg-slate-50",
-                ].join(" ")}
-                onClick={() => setActiveSegment(segment.id)}
-                aria-pressed={active}
-              >
-                <Icon size={20} />
-                <span>{segment.name}</span>
-              </button>
-            );
-          })}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-100">
+            {segments.map((segment) => {
+              const Icon = segment.icon;
+              const active = activeSegment === segment.id;
+
+              return (
+                <button
+                  type="button"
+                  key={`seg-${segment.id}`}
+                  className={[
+                    "min-w-0 flex items-center justify-center gap-2 px-3 py-3 md:px-4 md:py-4",
+                    "text-[11px] md:text-sm font-bold uppercase tracking-wide transition-colors",
+                    "text-center leading-snug border-b-4",
+                    active
+                      ? "bg-[#003D5C] text-white border-b-[#FFB81C]"
+                      : "bg-white text-[#003D5C] hover:bg-slate-50 border-b-transparent",
+                  ].join(" ")}
+                  onClick={() => setActiveSegment(segment.id)}
+                  aria-pressed={active}
+                >
+                  <Icon size={18} className="shrink-0" />
+                  <span className="min-w-0 break-words">{segment.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </nav>
       </div>
 
       {/* Filter chips */}
       <section
-        className="mx-auto mt-8 max-w-6xl px-4"
+        className="mx-auto mt-6 md:mt-8 max-w-6xl px-4"
         aria-label="Filter by school"
       >
         <div className="rounded-2xl bg-white p-4 shadow-lg shadow-black/10">
           <h3 className="mb-3 text-base font-semibold text-[#003D5C]">
             Filter by School
           </h3>
-          <div className="flex flex-wrap gap-2">
+
+          {/* mobile: horizontal scroll; md+: wrap */}
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 md:flex-wrap md:overflow-visible md:pb-0 md:mx-0 md:px-0">
             {displaySchools.map((s) => {
               const selected = selectedSchool === s.id;
-              const style: CSSProperties | undefined =
-                selected && s.color
-                  ? { backgroundColor: s.color, borderColor: s.color }
-                  : undefined;
+              const bg = selected ? (s.color ?? "#003D5C") : undefined;
+
+              const style: CSSProperties | undefined = selected
+                ? {
+                    backgroundColor: bg,
+                    borderColor: bg,
+                    color: pickTextColor(bg),
+                  }
+                : undefined;
 
               return (
                 <button
@@ -183,7 +216,7 @@ const HallOfFame: React.FC = () => {
                   className={[
                     "rounded-full border-2 px-4 py-1.5 text-xs font-semibold tracking-wide transition-colors",
                     selected
-                      ? "text-[#1A1A1A] shadow-sm"
+                      ? "text-white shadow-sm"
                       : "bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200",
                   ].join(" ")}
                   onClick={() => setSelectedSchool(s.id)}
@@ -206,10 +239,7 @@ const HallOfFame: React.FC = () => {
               <div className="w-full max-w-xl rounded-2xl bg-white p-10 text-center text-[#003D5C] shadow-xl shadow-black/30">
                 <div className="inline-flex items-center gap-3 font-bold tracking-wide">
                   <span>Loading</span>
-                  <span
-                    aria-hidden="true"
-                    className="flex items-center gap-1"
-                  >
+                  <span aria-hidden="true" className="flex items-center gap-1">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#003D5C]" />
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#003D5C] delay-150" />
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#003D5C] delay-300" />
@@ -218,7 +248,7 @@ const HallOfFame: React.FC = () => {
               </div>
             </div>
           ) : cards.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {cards.map((p, index) => {
                 const personId = p.person_id;
                 return (

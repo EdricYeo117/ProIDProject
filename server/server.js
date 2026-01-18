@@ -29,6 +29,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://localhost:3000",
+  "https://pro-id-project.vercel.app",
   process.env.CLIENT_ORIGIN,
 ].filter(Boolean);
 
@@ -37,7 +38,9 @@ const whitelist = new Set(allowedOrigins);
 const corsOrigin = isProd
   ? (origin, cb) => {
       if (!origin) return cb(null, true);
-      return whitelist.has(origin) ? cb(null, true) : cb(new Error("CORS blocked"));
+      return whitelist.has(origin)
+        ? cb(null, true)
+        : cb(new Error("CORS blocked"));
     }
   : true;
 
@@ -97,7 +100,7 @@ async function loadBoardAndMessages(boardKey) {
     `SELECT BOARD_ID, BOARD_KEY, TITLE
        FROM CANVAS_BOARD
       WHERE BOARD_KEY = :board_key`,
-    { board_key: boardKey }
+    { board_key: boardKey },
   );
 
   const boardRows = boardRes.rows || [];
@@ -121,7 +124,7 @@ async function loadBoardAndMessages(boardKey) {
     WHERE BOARD_ID = :board_id
     ORDER BY CREATED_AT ASC
   `,
-    { board_id: boardId }
+    { board_id: boardId },
   );
 
   const rows = msgRes.rows || [];
@@ -152,7 +155,7 @@ async function loadBoardAndMessages(boardKey) {
       ON m.MESSAGE_ID = rc.MESSAGE_ID
     WHERE m.BOARD_ID = :board_id
   `,
-    { board_id: boardId }
+    { board_id: boardId },
   );
 
   const rxRows = rxRes.rows || [];
@@ -184,7 +187,7 @@ async function incrementReactionCount(messageId, emoji) {
     WHEN NOT MATCHED THEN INSERT (message_id, emoji, reaction_count, updated_at)
     VALUES (src.message_id, src.emoji, 1, SYSTIMESTAMP)
   `,
-    { message_id: Number(messageId), emoji }
+    { message_id: Number(messageId), emoji },
   );
 
   const res = await db.execute(
@@ -194,7 +197,7 @@ async function incrementReactionCount(messageId, emoji) {
     WHERE message_id = :message_id
       AND emoji = :emoji
   `,
-    { message_id: Number(messageId), emoji }
+    { message_id: Number(messageId), emoji },
   );
 
   const row = (res.rows || [])[0];
@@ -248,7 +251,7 @@ io.on("connection", (socket) => {
         WHERE b.BOARD_KEY = :board_key
           AND m.MESSAGE_ID = :message_id
       `,
-        { board_key: boardKey, message_id: Number(messageId) }
+        { board_key: boardKey, message_id: Number(messageId) },
       );
 
       if (!(msgCheck.rows || []).length) return;
@@ -263,7 +266,9 @@ io.on("connection", (socket) => {
       });
     } catch (err) {
       console.error("canvas:react error:", err);
-      socket.emit("canvas:reaction-error", { message: "Failed to save reaction" });
+      socket.emit("canvas:reaction-error", {
+        message: "Failed to save reaction",
+      });
     }
   });
 

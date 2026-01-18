@@ -1,6 +1,7 @@
 // server/server.js
 require("dotenv").config();
-
+const https = require("https");
+const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const express = require("express");
@@ -21,30 +22,45 @@ const hofCommentsRoutes = require("./routes/hofComments.routes");
 const BOARD_FALLBACK = "NP-MEMORY-WALL-2025";
 
 const app = express();
+app.set("trust proxy", 1);
 
 /* ---------- CORS ---------- */
 const isProd = process.env.NODE_ENV === "production";
 
-const allowedOrigins = [
+// Set this in production to your Cloudflare domain, e.g. https://yourdomain.com
+// You can also add https://www.yourdomain.com if you use it.
+const PROD_ORIGINS = [
+  process.env.CLIENT_ORIGIN,       // e.g. https://yourdomain.com
+  process.env.CLIENT_ORIGIN_WWW,   // e.g. https://www.yourdomain.com (optional)
+].filter(Boolean);
+
+// Keep local dev + current vercel preview if you still use it
+const DEV_ORIGINS = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://localhost:3000",
   "https://pro-id-project.vercel.app",
-  process.env.CLIENT_ORIGIN,
-].filter(Boolean);
+];
 
+const allowedOrigins = isProd
+  ? PROD_ORIGINS
+  : [...DEV_ORIGINS, ...PROD_ORIGINS];
+
+// Normalize into a Set for fast lookup
 const whitelist = new Set(allowedOrigins);
 
-const corsOrigin = isProd
-  ? (origin, cb) => {
+const corsOrigin =
+  isProd
+    ? (origin, cb) => {
+      // Allow same-origin tools / health checks that send no Origin header
       if (!origin) return cb(null, true);
       return whitelist.has(origin)
         ? cb(null, true)
-        : cb(new Error("CORS blocked"));
+        : cb(new Error(`CORS blocked: ${origin}`));
     }
-  : true;
+    : true;
 
-app.use(cors({ origin: corsOrigin }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 
 /* ---------- Basic API routes (non-socket) ---------- */
@@ -60,12 +76,27 @@ app.use("/api/hof", hofCommentsRoutes);
 /* ---------- HTTP server + Socket.IO ---------- */
 const PORT = Number(process.env.PORT) || 8080;
 
-const server = http.createServer(app);
+let server;
+
+if (process.env.SSL_CERT_PATH && process.env.SSL_KEY_PATH) {
+  server = https.createServer(
+    {
+      cert: fs.readFileSync(process.env.SSL_CERT_PATH),
+      key: fs.readFileSync(process.env.SSL_KEY_PATH),
+    },
+    app,
+  );
+  console.log("HTTPS enabled (cert/key loaded).");
+} else {
+  server = http.createServer(app);
+  console.log("HTTP enabled (no cert/key paths set).");
+}
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins.length ? allowedOrigins : "*",
+    origin: corsOrigin, // <-- use the same policy as Express
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 

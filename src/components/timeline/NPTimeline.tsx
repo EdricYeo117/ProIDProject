@@ -43,7 +43,7 @@ async function jsonFetch<T = any>(url: string, init?: RequestInit): Promise<T> {
 function normalizeRows(rows: any[]): Milestone[] {
   return (rows || []).map((r) => {
     const obj = Object.fromEntries(
-      Object.entries(r).map(([k, v]) => [k.toLowerCase(), v])
+      Object.entries(r).map(([k, v]) => [k.toLowerCase(), v]),
     );
     return {
       id: Number(obj.id),
@@ -112,8 +112,8 @@ function Chip({
   const activeClass = gradient
     ? `bg-gradient-to-r ${gradient} border-white/20 text-white shadow`
     : tone === "purple"
-    ? "bg-gradient-to-r from-purple-600 to-fuchsia-600 border-purple-400/50 text-white shadow"
-    : "bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400/50 text-white shadow";
+      ? "bg-gradient-to-r from-purple-600 to-fuchsia-600 border-purple-400/50 text-white shadow"
+      : "bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400/50 text-white shadow";
 
   const idleClass =
     "bg-slate-800/70 border-slate-600 hover:bg-slate-800/90 hover:border-slate-400/70";
@@ -162,7 +162,7 @@ function EventCard({
             className={cx(
               "p-2 rounded-lg bg-gradient-to-br",
               colorClass,
-              "flex-shrink-0"
+              "flex-shrink-0",
             )}
           >
             <IconComponent className="w-5 h-5 text-white" />
@@ -176,7 +176,7 @@ function EventCard({
                 className={cx(
                   "text-xs font-semibold px-2 py-1 rounded-full bg-gradient-to-r",
                   colorClass,
-                  "text-white shadow"
+                  "text-white shadow",
                 )}
               >
                 {milestone.category}
@@ -186,7 +186,7 @@ function EventCard({
               className={cx(
                 "p-1 rounded-md bg-gradient-to-br",
                 colorClass,
-                "text-white/90 inline-flex"
+                "text-white/90 inline-flex",
               )}
             >
               <IconComponent className="w-4 h-4" />
@@ -207,7 +207,7 @@ function EventCard({
             className={cx(
               "p-2 rounded-lg bg-gradient-to-br",
               colorClass,
-              "flex-shrink-0"
+              "flex-shrink-0",
             )}
           >
             <IconComponent className="w-5 h-5 text-white" />
@@ -221,12 +221,11 @@ function EventCard({
 /* ─────────────────────────── Main ─────────────────────────── */
 const NAVBAR_OFFSET_PX = 88;
 const ERA_CLEARANCE_PX = 48; // extra space between filters and the first ERA badge
-const ERA_BADGE_OVERHANG_PX = 72; // height of the purple era chip + its margin
 
 export default function NPTimeline() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set()); // empty = ALL
@@ -261,14 +260,14 @@ export default function NPTimeline() {
     (async () => {
       try {
         const raw = await jsonFetch<any[]>(
-          `${API_BASE}/api/milestones?limit=5000`
+          `${API_BASE}/api/milestones?limit=5000`,
         );
         const data = normalizeRows(raw).filter((m) => Number.isFinite(m.year));
         data.sort(
           (a, b) =>
             a.year - b.year ||
             (a.display_order ?? 0) - (b.display_order ?? 0) ||
-            a.id - b.id
+            a.id - b.id,
         );
         if (!alive) return;
         setMilestones(data);
@@ -293,37 +292,37 @@ export default function NPTimeline() {
   // Unique filters
   const allCategories = useMemo(() => {
     return Array.from(
-      new Set(milestones.map((m) => m.category).filter(Boolean) as string[])
+      new Set(milestones.map((m) => m.category).filter(Boolean) as string[]),
     ).sort();
   }, [milestones]);
 
-const allEras = useMemo(() => {
-  // build ranges once from milestones (or keep your existing eraYearRanges memo)
-  const ranges = new Map<string, { min: number; max: number }>();
+  const allEras = useMemo(() => {
+    // build ranges once from milestones (or keep your existing eraYearRanges memo)
+    const ranges = new Map<string, { min: number; max: number }>();
 
-  milestones.forEach((m) => {
-    const e = (m.era_name ?? "").trim();
-    if (!e) return;
-    const r = ranges.get(e);
-    if (!r) ranges.set(e, { min: m.year, max: m.year });
-    else {
-      r.min = Math.min(r.min, m.year);
-      r.max = Math.max(r.max, m.year);
-    }
-  });
+    milestones.forEach((m) => {
+      const e = (m.era_name ?? "").trim();
+      if (!e) return;
+      const r = ranges.get(e);
+      if (!r) ranges.set(e, { min: m.year, max: m.year });
+      else {
+        r.min = Math.min(r.min, m.year);
+        r.max = Math.max(r.max, m.year);
+      }
+    });
 
-  // unique eras
-  const eras = Array.from(ranges.keys());
+    // unique eras
+    const eras = Array.from(ranges.keys());
 
-  // sort by min year asc (then max asc, then name)
-  eras.sort((a, b) => {
-    const ra = ranges.get(a)!;
-    const rb = ranges.get(b)!;
-    return ra.min - rb.min || ra.max - rb.max || a.localeCompare(b);
-  });
+    // sort by min year asc (then max asc, then name)
+    eras.sort((a, b) => {
+      const ra = ranges.get(a)!;
+      const rb = ranges.get(b)!;
+      return ra.min - rb.min || ra.max - rb.max || a.localeCompare(b);
+    });
 
-  return eras;
-}, [milestones]);
+    return eras;
+  }, [milestones]);
 
   // Era year ranges for labels
   const eraYearRanges = useMemo(() => {
@@ -382,10 +381,6 @@ const allEras = useMemo(() => {
     };
   }, [grouped.length]);
 
-  const Icon = selectedMilestone
-    ? categoryIcons[selectedMilestone.category ?? ""] || Calendar
-    : Calendar;
-
   if (isLoading) {
     return (
       <div
@@ -405,7 +400,7 @@ const allEras = useMemo(() => {
   /* helpers for chips */
   const toggleSet = (
     setter: React.Dispatch<React.SetStateAction<Set<string>>>,
-    value: string
+    value: string,
   ) => {
     setter((prev) => {
       const next = new Set(prev);
@@ -516,131 +511,143 @@ const allEras = useMemo(() => {
 
           {/* ── Timeline ──────────────────────────────────────────────── */}
 
-{/* ── Timeline / Empty state ──────────────────────────────────────────────── */}
-<div
-  className="relative"
-  style={{ marginTop: trayH + eraH + ERA_CLEARANCE_PX }}
->
-  {hasResults ? (
-    <>
-      {/* vertical spine */}
-      <div
-        className="absolute left-1/2 top-0 bottom-0 w-[2px] z-0
+          {/* ── Timeline / Empty state ──────────────────────────────────────────────── */}
+          <div
+            className="relative"
+            style={{ marginTop: trayH + eraH + ERA_CLEARANCE_PX }}
+          >
+            {hasResults ? (
+              <>
+                {/* vertical spine */}
+                <div
+                  className="absolute left-1/2 top-0 bottom-0 w-[2px] z-0
           bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2"
-      />
+                />
 
-      <div className="space-y-28 md:space-y-32">
-        {grouped.map(([year, items], idx) => {
-          const isLeft = idx % 2 === 0;
-          const era = (items[0]?.era_name || "").trim();
-          const showEra = era && era !== lastEraShown;
-          if (showEra) lastEraShown = era;
+                <div className="space-y-28 md:space-y-32">
+                  {grouped.map(([year, items], idx) => {
+                    const isLeft = idx % 2 === 0;
+                    const era = (items[0]?.era_name || "").trim();
+                    const showEra = era && era !== lastEraShown;
+                    if (showEra) lastEraShown = era;
 
-          return (
-            <div key={year} className="relative">
-              <div className="flex items-start justify-center">
-                {/* LEFT column */}
-                <div className={cx("w-[44%]", isLeft ? "pr-12" : "invisible")}>
-                  {isLeft && (
-                    <>
-                      <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
-                        {year}
+                    return (
+                      <div key={year} className="relative">
+                        <div className="flex items-start justify-center">
+                          {/* LEFT column */}
+                          <div
+                            className={cx(
+                              "w-[44%]",
+                              isLeft ? "pr-12" : "invisible",
+                            )}
+                          >
+                            {isLeft && (
+                              <>
+                                <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
+                                  {year}
+                                </div>
+
+                                <div className="space-y-4">
+                                  {items.map((m) => (
+                                    <EventCard
+                                      key={m.id}
+                                      milestone={m}
+                                      side="left"
+                                      onClick={() => setSelectedMilestone(m)}
+                                    />
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Center */}
+                          <div className="relative z-0 flex-shrink-0">
+                            {showEra && (
+                              <div
+                                ref={idx === 0 ? firstEraRef : undefined}
+                                className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
+                              >
+                                <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
+                                  {era}
+                                </div>
+                              </div>
+                            )}
+                            <div className="w-9 h-9 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
+                          </div>
+
+                          {/* RIGHT column */}
+                          <div
+                            className={cx(
+                              "w-[44%]",
+                              !isLeft ? "pl-12" : "invisible",
+                            )}
+                          >
+                            {!isLeft && (
+                              <>
+                                <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
+                                  {year}
+                                </div>
+                                <div className="space-y-4">
+                                  {items.map((m) => (
+                                    <EventCard
+                                      key={m.id}
+                                      milestone={m}
+                                      side="right"
+                                      onClick={() => setSelectedMilestone(m)}
+                                    />
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
-
-                      <div className="space-y-4">
-                        {items.map((m) => (
-                          <EventCard
-                            key={m.id}
-                            milestone={m}
-                            side="left"
-                            onClick={() => setSelectedMilestone(m)}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                    );
+                  })}
                 </div>
+              </>
+            ) : (
+              <div className="grid place-items-center py-24">
+                <div className="max-w-xl w-full rounded-2xl border border-slate-700/60 bg-slate-900/70 backdrop-blur px-6 py-8 text-center shadow-xl">
+                  <h2 className="text-xl font-semibold text-white mb-2">
+                    {hasAnyData
+                      ? "No milestones match your filters"
+                      : "No milestones available yet"}
+                  </h2>
 
-                {/* Center */}
-                <div className="relative z-0 flex-shrink-0">
-                  {showEra && (
-                    <div
-                      ref={idx === 0 ? firstEraRef : undefined}
-                      className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
+                  <p className="text-sm text-slate-300 mb-6">
+                    {hasAnyData
+                      ? "Adjust the Category/Era filters, or clear them to see all milestones."
+                      : "Insert milestone data to populate the timeline."}
+                  </p>
+
+                  <div className="flex items-center justify-center gap-3">
+                    {hasActiveFilters && (
+                      <button
+                        onClick={() => {
+                          setCategoryFilter(new Set());
+                          setEraFilter(new Set());
+                        }}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() =>
+                        window.scrollTo({ top: 0, behavior: "smooth" })
+                      }
+                      className="px-4 py-2 rounded-xl border border-slate-600 text-slate-200 hover:border-slate-400 hover:bg-slate-800/50"
                     >
-                      <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
-                        {era}
-                      </div>
-                    </div>
-                  )}
-                  <div className="w-9 h-9 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
-                </div>
-
-                {/* RIGHT column */}
-                <div className={cx("w-[44%]", !isLeft ? "pl-12" : "invisible")}>
-                  {!isLeft && (
-                    <>
-                      <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
-                        {year}
-                      </div>
-                      <div className="space-y-4">
-                        {items.map((m) => (
-                          <EventCard
-                            key={m.id}
-                            milestone={m}
-                            side="right"
-                            onClick={() => setSelectedMilestone(m)}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                      Back to filters
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  ) : (
-    <div className="grid place-items-center py-24">
-      <div className="max-w-xl w-full rounded-2xl border border-slate-700/60 bg-slate-900/70 backdrop-blur px-6 py-8 text-center shadow-xl">
-        <h2 className="text-xl font-semibold text-white mb-2">
-          {hasAnyData
-            ? "No milestones match your filters"
-            : "No milestones available yet"}
-        </h2>
-
-        <p className="text-sm text-slate-300 mb-6">
-          {hasAnyData
-            ? "Adjust the Category/Era filters, or clear them to see all milestones."
-            : "Insert milestone data to populate the timeline."}
-        </p>
-
-        <div className="flex items-center justify-center gap-3">
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setCategoryFilter(new Set());
-                setEraFilter(new Set());
-              }}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow"
-            >
-              Clear filters
-            </button>
-          )}
-
-          <button
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="px-4 py-2 rounded-xl border border-slate-600 text-slate-200 hover:border-slate-400 hover:bg-slate-800/50"
-          >
-            Back to filters
-          </button>
-        </div>
-      </div>
-    </div>
-  )}
-</div>
+            )}
+          </div>
 
           <div className="h-24" />
         </div>
@@ -674,7 +681,7 @@ const allEras = useMemo(() => {
                       className={cx(
                         "p-4 rounded-2xl bg-gradient-to-br",
                         color,
-                        "shadow-lg"
+                        "shadow-lg",
                       )}
                     >
                       <Ico className="w-10 h-10 text-white" />
@@ -689,7 +696,7 @@ const allEras = useMemo(() => {
                             className={cx(
                               "text-xs font-semibold px-3 py-1 rounded-full bg-gradient-to-r",
                               color,
-                              "text-white"
+                              "text-white",
                             )}
                           >
                             {selectedMilestone.category}

@@ -1,7 +1,14 @@
 // components/common/TopNav.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, ShieldPlus, History, MessageCircle, Menu, X } from "lucide-react";
+import {
+  Users,
+  ShieldPlus,
+  History,
+  MessageCircle,
+  Menu,
+  X,
+} from "lucide-react";
 
 const pillBase =
   "relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold " +
@@ -30,7 +37,8 @@ function navClass({
   const amberIdle =
     "bg-white text-slate-700 border-amber-200 hover:bg-amber-50 hover:text-sky-900 hover:border-amber-300 hover:shadow-sm";
 
-  if (variant === "primary") return [pillBase, isActive ? primaryActive : primaryIdle].join(" ");
+  if (variant === "primary")
+    return [pillBase, isActive ? primaryActive : primaryIdle].join(" ");
   return [pillBase, isActive ? amberActive : amberIdle].join(" ");
 }
 
@@ -59,7 +67,9 @@ export default function TopNav() {
         <nav className="hidden md:flex items-center gap-2">
           <NavLink
             to="/hall-of-fame"
-            className={({ isActive }) => `group ${navClass({ isActive, variant: "primary" })}`}
+            className={({ isActive }) =>
+              `group ${navClass({ isActive, variant: "primary" })}`
+            }
           >
             <Users size={18} strokeWidth={2} />
             <span>Hall of Fame</span>
@@ -68,7 +78,9 @@ export default function TopNav() {
 
           <NavLink
             to="/timeline"
-            className={({ isActive }) => `group ${navClass({ isActive, variant: "primary" })}`}
+            className={({ isActive }) =>
+              `group ${navClass({ isActive, variant: "primary" })}`
+            }
           >
             <History size={18} strokeWidth={2} />
             <span>Timeline</span>
@@ -79,7 +91,9 @@ export default function TopNav() {
 
           <NavLink
             to="/community-canvas"
-            className={({ isActive }) => `group ${navClass({ isActive, variant: "canvas" })}`}
+            className={({ isActive }) =>
+              `group ${navClass({ isActive, variant: "canvas" })}`
+            }
           >
             <MessageCircle size={18} strokeWidth={2} />
             <span>Community Canvas</span>
@@ -88,7 +102,9 @@ export default function TopNav() {
 
           <NavLink
             to="/admin"
-            className={({ isActive }) => `group ${navClass({ isActive, variant: "admin" })}`}
+            className={({ isActive }) =>
+              `group ${navClass({ isActive, variant: "admin" })}`
+            }
           >
             <ShieldPlus size={18} strokeWidth={2} />
             <span>Admin</span>
@@ -102,7 +118,11 @@ export default function TopNav() {
           className="md:hidden inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50 transition-colors"
           aria-label="Toggle menu"
         >
-          {mobileMenuOpen ? <X size={22} className="text-sky-900" /> : <Menu size={22} className="text-sky-900" />}
+          {mobileMenuOpen ? (
+            <X size={22} className="text-sky-900" />
+          ) : (
+            <Menu size={22} className="text-sky-900" />
+          )}
         </button>
       </div>
 

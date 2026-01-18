@@ -1,5 +1,5 @@
 // src/components/canvas/CommunityCanvas.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 type MessageColor = "sky" | "emerald" | "amber" | "violet";
@@ -35,7 +35,9 @@ type Board = {
 };
 
 const WORLD_SIZE = 5000;
-const API_BASE = "http://localhost:8080";
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8080")
+  .toString()
+  .replace(/\/+$/, "");
 
 // Note border styles by category color
 const COLOR_STYLES: Record<MessageColor, string> = {
@@ -70,10 +72,9 @@ const FEEL_GRADIENT: Record<string, string> = {
   "🤯": "bg-gradient-to-r from-emerald-400/70 via-teal-300/50 to-lime-400/40",
 };
 
-
 const COLOR_OPTIONS: { value: MessageColor; label: string }[] = [
   { value: "sky", label: "Memory" },
-  { dramatic: undefined as never, value: "emerald", label: "Gratitude" },
+  { value: "emerald", label: "Gratitude" },
   { value: "amber", label: "Milestone" },
   { value: "violet", label: "Fun / Random" },
 ];
@@ -216,7 +217,7 @@ const CommunityCanvas: React.FC = () => {
         if (payload.boardKey !== selectedBoardKey) return;
         setMessages(payload.messages ?? []);
         setLoading(false);
-      }
+      },
     );
 
     socket.on("canvas:init-error", (payload: { message: string }) => {
@@ -255,9 +256,9 @@ const CommunityCanvas: React.FC = () => {
                 [payload.emoji]: payload.count,
               },
             };
-          })
+          }),
         );
-      }
+      },
     );
     socket.on("disconnect", () => {
       // optional logging
@@ -339,6 +340,7 @@ const CommunityCanvas: React.FC = () => {
       boardKey: selectedBoardKey,
       messageId,
       emoji,
+      reactorKey, // <-- now used
     });
 
     window.setTimeout(() => {
@@ -347,7 +349,7 @@ const CommunityCanvas: React.FC = () => {
         delete next[busyKey];
         return next;
       });
-    }, 120); // keep small debounce for double-taps; reduce/remove if you want
+    }, 120);
   };
 
   /* ---------- Message form ---------- */
@@ -584,87 +586,89 @@ const CommunityCanvas: React.FC = () => {
                     onClick={() => toggleOpenMessage(m.id)}
                   />
 
-{/* card (only one open at a time => no overlap mess) */}
-{showCards && (
-  <div
-    className={`mt-2 w-[360px] max-w-[360px] rounded-2xl p-[1px] ${feelFrame}`}
-  >
-    <div
-      className={`
+                  {/* card (only one open at a time => no overlap mess) */}
+                  {showCards && (
+                    <div
+                      className={`mt-2 w-[360px] max-w-[360px] rounded-2xl p-[1px] ${feelFrame}`}
+                    >
+                      <div
+                        className={`
         rounded-2xl bg-slate-900/95 px-4 py-3
         text-xs text-slate-100 shadow-xl backdrop-blur-sm
         border relative
         ${COLOR_STYLES[color]}
         ${feelGlow}
       `}
-    >
-      {/* tail */}
-      <div className="absolute -top-1 left-3 w-2 h-2 bg-slate-900 border-l border-t border-sky-500/70 rotate-45" />
-<div className="flex items-start justify-between gap-2">
-  {/* LEFT: allow shrink */}
-  <div className="min-w-0">
-    <div className="font-semibold text-[0.8rem] text-sky-300">
-      {m.author ?? "Anonymous"}
-    </div>
+                      >
+                        {/* tail */}
+                        <div className="absolute -top-1 left-3 w-2 h-2 bg-slate-900 border-l border-t border-sky-500/70 rotate-45" />
+                        <div className="flex items-start justify-between gap-2">
+                          {/* LEFT: allow shrink */}
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[0.8rem] text-sky-300">
+                              {m.author ?? "Anonymous"}
+                            </div>
 
-    <div
-      className="
+                            <div
+                              className="
         mt-1 leading-snug text-[0.82rem]
         break-words break-all
         overflow-hidden
       "
-      style={{ overflowWrap: "anywhere" }}
-    >
-      {m.text}
-    </div>
-  </div>
+                              style={{ overflowWrap: "anywhere" }}
+                            >
+                              {m.text}
+                            </div>
+                          </div>
 
-  {/* RIGHT: feel */}
-  {m.feel ? (
-    <div
-      className={`
+                          {/* RIGHT: feel */}
+                          {m.feel ? (
+                            <div
+                              className={`
         shrink-0 w-8 h-8 rounded-full
         bg-slate-800/70 border border-slate-600
         flex items-center justify-center text-base
         ${FEEL_GLOW[m.feel] ?? ""}
       `}
-      title="Note feel"
-    >
-      {m.feel}
-    </div>
-  ) : null}
-</div>
+                              title="Note feel"
+                            >
+                              {m.feel}
+                            </div>
+                          ) : null}
+                        </div>
 
-      <div className="mt-2 text-[0.7rem] text-slate-400 flex items-center justify-between">
-        <span>
-          {new Date(m.createdAt).toLocaleDateString("en-SG", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })}
-        </span>
-        <span>
-          {new Date(m.createdAt).toLocaleTimeString("en-SG", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
-      </div>
+                        <div className="mt-2 text-[0.7rem] text-slate-400 flex items-center justify-between">
+                          <span>
+                            {new Date(m.createdAt).toLocaleDateString("en-SG", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <span>
+                            {new Date(m.createdAt).toLocaleTimeString("en-SG", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
 
-      {/* reactions */}
-      <div className="mt-3">
-        <div className="text-[0.7rem] text-slate-400 mb-1">React to this note</div>
-        <div className="flex flex-wrap gap-2">
-          {REACTION_OPTIONS.map((emoji) => {
-            const count = m.reactions?.[emoji] ?? 0;
-            const busyKey = `${m.id}:${emoji}`;
-            const busy = !!reactionBusy[busyKey];
+                        {/* reactions */}
+                        <div className="mt-3">
+                          <div className="text-[0.7rem] text-slate-400 mb-1">
+                            React to this note
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {REACTION_OPTIONS.map((emoji) => {
+                              const count = m.reactions?.[emoji] ?? 0;
+                              const busyKey = `${m.id}:${emoji}`;
+                              const busy = !!reactionBusy[busyKey];
 
-            return (
-              <button
-                key={emoji}
-                type="button"
-                className={`
+                              return (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  className={`
                   flex items-center gap-2
                   px-2.5 py-1.5 rounded-full
                   border border-slate-700 bg-slate-950/60
@@ -672,30 +676,32 @@ const CommunityCanvas: React.FC = () => {
                   text-[0.75rem]
                   disabled:opacity-60
                 `}
-                onClick={() => sendReaction(m.id, emoji)}
-                disabled={busy}
-                title="Add reaction"
-              >
-                <span className="text-sm">{emoji}</span>
-                <span className="text-slate-200 tabular-nums">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                                  onClick={() => sendReaction(m.id, emoji)}
+                                  disabled={busy}
+                                  title="Add reaction"
+                                >
+                                  <span className="text-sm">{emoji}</span>
+                                  <span className="text-slate-200 tabular-nums">
+                                    {count}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          className="text-[0.7rem] text-slate-400 hover:text-slate-200"
-          onClick={() => setActiveMessageId(null)}
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            className="text-[0.7rem] text-slate-400 hover:text-slate-200"
+                            onClick={() => setActiveMessageId(null)}
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

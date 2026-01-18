@@ -55,7 +55,7 @@ app.use(achievementTypesRoutes);
 app.use("/api/hof", hofCommentsRoutes);
 
 /* ---------- HTTP server + Socket.IO ---------- */
-const port = Number(process.env.PORT) || 8080;
+const PORT = Number(process.env.PORT) || 8080;
 
 const server = http.createServer(app);
 
@@ -295,7 +295,9 @@ app.use((err, _req, res, _next) => {
 (async () => {
   try {
     await initPool();
-    server.listen(port, () => console.log(`HOF API + Canvas WebSocket listening on :${port}`));
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`HOF API + Canvas WebSocket listening on :${PORT}`);
+    });
   } catch (err) {
     console.error("Failed to initialize DB pool:", err);
     process.exit(1);

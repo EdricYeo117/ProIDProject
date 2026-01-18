@@ -277,16 +277,16 @@ io.on("connection", (socket) => {
   });
 });
 
-/* ---------- Static SPA (optional for production) ---------- */
-if (isProd) {
-  const distDir = path.join(__dirname, "..", "dist");
-  app.use(express.static(distDir));
+// /* ---------- Static SPA (optional for production) ---------- */
+// if (isProd) {
+//   const distDir = path.join(__dirname, "..", "dist");
+//   app.use(express.static(distDir));
 
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api")) return next();
-    res.sendFile(path.join(distDir, "index.html"));
-  });
-}
+//   app.get("*", (req, res, next) => {
+//     if (req.path.startsWith("/api")) return next();
+//     res.sendFile(path.join(distDir, "index.html"));
+//   });
+// }
 
 /* ---------- 404 & error handlers ---------- */
 app.use((req, res) => res.status(404).json({ error: "Not found" }));

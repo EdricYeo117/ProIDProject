@@ -55,7 +55,7 @@ export default function TopNav() {
           </div>
           <div className="leading-tight">
             <div className="text-xl font-black tracking-tight text-sky-900">
-              NP Hall of Fame
+              Echoes of NP
             </div>
             <div className="text-xs font-medium text-slate-500 -mt-0.5">
               Ngee Ann Polytechnic

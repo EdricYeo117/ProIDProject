@@ -123,7 +123,9 @@ function Chip({
       onClick={onClick}
       aria-pressed={!!active}
       className={[
-        "px-3 py-1 rounded-full text-[13px] border transition-colors",
+        "shrink-0 whitespace-nowrap rounded-full border transition-colors",
+        "px-2.5 py-1 sm:px-3 sm:py-1.5",
+        "text-[12px] sm:text-[13px]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0",
         tone === "purple"
           ? "text-purple-100/90 focus-visible:ring-purple-400/50"
@@ -151,7 +153,7 @@ function EventCard({
 
   return (
     <div
-      className="bg-slate-800/95 backdrop-blur-lg rounded-2xl px-6 py-5 border border-slate-700/50 shadow-2xl hover:border-blue-500/50 transition-all duration-200 cursor-pointer"
+      className="bg-slate-800/95 backdrop-blur-lg rounded-2xl px-4 py-4 sm:px-6 sm:py-5 border border-slate-700/50 shadow-2xl hover:border-blue-500/50 transition-all duration-200 cursor-pointer"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -424,7 +426,7 @@ export default function NPTimeline() {
       style={{ scrollPaddingTop: NAVBAR_OFFSET_PX + trayH + eraH }}
     >
       {/* Space for fixed navbar */}
-      <div className="pt-32 md:pt-36 px-6 sm:px-12 pb-20">
+      <div className="pt-28 md:pt-36 px-4 sm:px-6 md:px-12 pb-20">
         <div className="max-w-6xl mx-auto mb-6 rounded-2xl bg-slate-900/70 border border-slate-700/50 shadow-xl backdrop-blur px-5 py-4">
           {/* ── Filters row ───────────────────────────────────────────── */}
           <div
@@ -439,7 +441,7 @@ export default function NPTimeline() {
                   <div className="mb-2 text-xs font-medium text-blue-300/90 uppercase tracking-wider">
                     Category
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2 overflow-x-auto flex-nowrap pb-2 -mx-1 px-1 md:flex-wrap md:overflow-visible md:pb-0 md:mx-0 md:px-0">
                     <Chip
                       active={categoryFilter.size === 0}
                       onClick={() => setCategoryFilter(new Set())}
@@ -464,7 +466,11 @@ export default function NPTimeline() {
                   <div className="mb-2 text-xs font-medium text-purple-300/90 uppercase tracking-wider">
                     Era
                   </div>
-                  <div className="flex gap-2 flex-wrap items-center">
+
+                  <div
+                    className="flex gap-2 overflow-x-auto flex-nowrap pb-2 -mx-1 px-1 items-center
+                  md:flex-wrap md:overflow-visible md:pb-0 md:mx-0 md:px-0"
+                  >
                     <Chip
                       tone="purple"
                       active={eraFilter.size === 0}
@@ -472,6 +478,7 @@ export default function NPTimeline() {
                     >
                       All
                     </Chip>
+
                     {allEras.map((e) => {
                       const range = eraYearRanges.get(e);
                       const label = range
@@ -490,14 +497,13 @@ export default function NPTimeline() {
                       );
                     })}
 
-                    {/* Clear button */}
                     {(categoryFilter.size > 0 || eraFilter.size > 0) && (
                       <button
                         onClick={() => {
                           setCategoryFilter(new Set());
                           setEraFilter(new Set());
                         }}
-                        className="ml-auto px-4 py-1.5 rounded-full text-sm font-medium border-2 border-slate-600 text-slate-300 hover:border-red-400 hover:text-white hover:bg-red-600 transition-all"
+                        className="shrink-0 ml-auto px-4 py-1.5 rounded-full text-sm font-medium border-2 border-slate-600 text-slate-300 hover:border-red-400 hover:text-white hover:bg-red-600 transition-all"
                         title="Clear all filters"
                       >
                         Clear All
@@ -520,10 +526,10 @@ export default function NPTimeline() {
               <>
                 {/* vertical spine */}
                 <div
-                  className="absolute left-1/2 top-0 bottom-0 w-[2px] z-0
-          bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40 -translate-x-1/2"
+                  className="absolute left-5 md:left-1/2 top-0 bottom-0 w-[2px] z-0
+  bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-pink-500/40
+  md:-translate-x-1/2"
                 />
-
                 <div className="space-y-28 md:space-y-32">
                   {grouped.map(([year, items], idx) => {
                     const isLeft = idx % 2 === 0;
@@ -533,73 +539,126 @@ export default function NPTimeline() {
 
                     return (
                       <div key={year} className="relative">
-                        <div className="flex items-start justify-center">
-                          {/* LEFT column */}
-                          <div
-                            className={cx(
-                              "w-[44%]",
-                              isLeft ? "pr-12" : "invisible",
-                            )}
-                          >
-                            {isLeft && (
-                              <>
-                                <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
-                                  {year}
-                                </div>
-
-                                <div className="space-y-4">
-                                  {items.map((m) => (
-                                    <EventCard
-                                      key={m.id}
-                                      milestone={m}
-                                      side="left"
-                                      onClick={() => setSelectedMilestone(m)}
-                                    />
-                                  ))}
-                                </div>
-                              </>
-                            )}
-                          </div>
-
-                          {/* Center */}
-                          <div className="relative z-0 flex-shrink-0">
-                            {showEra && (
+                        {/* -------------------- MOBILE (single column) -------------------- */}
+                        <div className="md:hidden relative pl-10">
+                          {/* Era badge (mobile) */}
+                          {showEra && (
+                            <div className="mb-4">
                               <div
-                                ref={idx === 0 ? firstEraRef : undefined}
-                                className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
+                                className="inline-block px-5 py-2 rounded-full font-bold text-[14px]
+            bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50
+            text-white shadow-lg"
                               >
-                                <div className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px] bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap">
-                                  {era}
-                                </div>
+                                {era}
                               </div>
-                            )}
-                            <div className="w-9 h-9 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
+                            </div>
+                          )}
+
+                          {/* Year (mobile sized) */}
+                          <div
+                            className="text-yellow-400 text-[56px] sm:text-[72px] leading-[0.95]
+        drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-4"
+                          >
+                            {year}
                           </div>
 
-                          {/* RIGHT column */}
-                          <div
-                            className={cx(
-                              "w-[44%]",
-                              !isLeft ? "pl-12" : "invisible",
-                            )}
-                          >
-                            {!isLeft && (
-                              <>
-                                <div className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9] drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors">
-                                  {year}
+                          {/* Dot aligned to spine */}
+                          <div className="absolute left-5 top-8 -translate-x-1/2">
+                            <div className="w-8 h-8 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
+                          </div>
+                          {/* Cards full width */}
+                          <div className="space-y-4">
+                            {items.map((m) => (
+                              <EventCard
+                                key={m.id}
+                                milestone={m}
+                                side="left"
+                                onClick={() => setSelectedMilestone(m)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* -------------------- DESKTOP (your original 2-column) -------------------- */}
+                        <div className="hidden md:block">
+                          <div className="flex items-start justify-center">
+                            {/* LEFT column */}
+                            <div
+                              className={cx(
+                                "w-[44%]",
+                                isLeft ? "pr-12" : "invisible",
+                              )}
+                            >
+                              {isLeft && (
+                                <>
+                                  <div
+                                    className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9]
+                drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors"
+                                  >
+                                    {year}
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    {items.map((m) => (
+                                      <EventCard
+                                        key={m.id}
+                                        milestone={m}
+                                        side="left"
+                                        onClick={() => setSelectedMilestone(m)}
+                                      />
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Center */}
+                            <div className="relative z-0 flex-shrink-0">
+                              {showEra && (
+                                <div
+                                  ref={idx === 0 ? firstEraRef : undefined}
+                                  className="absolute z-0 bottom-full left-1/2 -translate-x-1/2 mb-10 md:mb-12"
+                                >
+                                  <div
+                                    className="px-6 md:px-7 py-2.5 md:py-3 rounded-full font-bold text-[15px] md:text-[17px]
+                bg-gradient-to-r from-blue-600 to-purple-600 border-2 border-blue-400/50 text-white shadow-lg whitespace-nowrap"
+                                  >
+                                    {era}
+                                  </div>
                                 </div>
-                                <div className="space-y-4">
-                                  {items.map((m) => (
-                                    <EventCard
-                                      key={m.id}
-                                      milestone={m}
-                                      side="right"
-                                      onClick={() => setSelectedMilestone(m)}
-                                    />
-                                  ))}
-                                </div>
-                              </>
-                            )}
+                              )}
+                              <div className="w-9 h-9 rounded-full bg-yellow-400 ring-[5px] ring-yellow-300/50 shadow-[0_0_30px_rgba(250,204,21,.45)]" />
+                            </div>
+
+                            {/* RIGHT column */}
+                            <div
+                              className={cx(
+                                "w-[44%]",
+                                !isLeft ? "pl-12" : "invisible",
+                              )}
+                            >
+                              {!isLeft && (
+                                <>
+                                  <div
+                                    className="text-yellow-400 hover:text-yellow-300 text-[72px] md:text-[96px] lg:text-[120px] leading-[0.9]
+                drop-shadow-[0_6px_20px_rgba(0,0,0,.35)] font-black tracking-tight mb-6 transition-colors"
+                                  >
+                                    {year}
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    {items.map((m) => (
+                                      <EventCard
+                                        key={m.id}
+                                        milestone={m}
+                                        side="right"
+                                        onClick={() => setSelectedMilestone(m)}
+                                      />
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -648,7 +707,6 @@ export default function NPTimeline() {
               </div>
             )}
           </div>
-
           <div className="h-24" />
         </div>
       </div>

@@ -302,22 +302,125 @@ const CommunityCanvas: React.FC = () => {
     setOffset({ x: newOffsetX, y: newOffsetY });
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    setIsPanning(true);
-    setPanStart({ x: e.clientX, y: e.clientY });
-    setOffsetStart(offset);
+  // --- Pointer gesture state (pan + pinch) ---
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const panLastRef = useRef<{ x: number; y: number } | null>(null);
+
+  const pinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+    worldMid: { x: number; y: number };
+  } | null>(null);
+
+  const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+
+  // --- Pointer gesture handlers ---
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // only primary button for mouse; allow touch/pen always
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    e.preventDefault();
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const pts = Array.from(pointersRef.current.values());
+
+    // 1 pointer => start panning
+    if (pts.length === 1) {
+      panLastRef.current = { x: e.clientX, y: e.clientY };
+      setIsPanning(true);
+      pinchRef.current = null;
+      return;
+    }
+
+    // 2 pointers => start pinch
+    if (pts.length === 2 && containerRef.current) {
+      const [p1, p2] = pts;
+      const rect = containerRef.current.getBoundingClientRect();
+
+      const midX = (p1.x + p2.x) / 2 - rect.left;
+      const midY = (p1.y + p2.y) / 2 - rect.top;
+
+      const worldMid = {
+        x: (midX - offset.x) / scale,
+        y: (midY - offset.y) / scale,
+      };
+
+      pinchRef.current = {
+        startDist: distance(p1, p2),
+        startScale: scale,
+        worldMid,
+      };
+
+      setIsPanning(false);
+      panLastRef.current = null;
+    }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPanning) return;
-    const dx = e.clientX - panStart.x;
-    const dy = e.clientY - panStart.y;
-    setOffset({ x: offsetStart.x + dx, y: offsetStart.y + dy });
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(e.pointerId)) return;
+
+    e.preventDefault();
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const pts = Array.from(pointersRef.current.values());
+
+    // 2 pointers => pinch zoom
+    if (pts.length === 2 && pinchRef.current && containerRef.current) {
+      const [p1, p2] = pts;
+      const rect = containerRef.current.getBoundingClientRect();
+
+      const midX = (p1.x + p2.x) / 2 - rect.left;
+      const midY = (p1.y + p2.y) / 2 - rect.top;
+
+      const newDist = distance(p1, p2);
+      const factor = newDist / Math.max(1, pinchRef.current.startDist);
+      const newScale = clamp(pinchRef.current.startScale * factor, 0.05, 3);
+
+      // keep the world point under the pinch midpoint stable
+      const newOffsetX = midX - pinchRef.current.worldMid.x * newScale;
+      const newOffsetY = midY - pinchRef.current.worldMid.y * newScale;
+
+      setScale(newScale);
+      setOffset({ x: newOffsetX, y: newOffsetY });
+      return;
+    }
+
+    // 1 pointer => pan
+    if (pts.length === 1) {
+      const last = panLastRef.current;
+      if (!last) {
+        panLastRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      panLastRef.current = { x: e.clientX, y: e.clientY };
+      setOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+    }
   };
 
-  const handleMouseUp = () => setIsPanning(false);
-  const handleMouseLeave = () => setIsPanning(false);
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.delete(e.pointerId);
+    }
+
+    const pts = Array.from(pointersRef.current.values());
+
+    // if one pointer remains, continue panning from its current position
+    if (pts.length === 1) {
+      panLastRef.current = { x: pts[0].x, y: pts[0].y };
+      pinchRef.current = null;
+      setIsPanning(true);
+    } else {
+      panLastRef.current = null;
+      pinchRef.current = null;
+      setIsPanning(false);
+    }
+  };
 
   /* ---------- Open note (prevents overlap) ---------- */
   const toggleOpenMessage = (id: string) => {
@@ -481,53 +584,64 @@ const CommunityCanvas: React.FC = () => {
   /* ---------- Render ---------- */
   return (
     <div className="w-full h-[calc(100vh-64px)] bg-slate-900 flex flex-col">
-      <div className="p-3 text-sm text-slate-100 flex items-center gap-4 border-b border-slate-700">
-        <div className="font-semibold text-base">{boardTitle}</div>
+      <div className="p-3 text-sm text-slate-100 border-b border-slate-700">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div className="font-semibold text-base">{boardTitle}</div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-300">Board:</span>
-          <select
-            className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-slate-100"
-            value={selectedBoardKey ?? ""}
-            onChange={(e) => setSelectedBoardKey(e.target.value || null)}
-            disabled={boardsLoading || boards.length === 0}
-          >
-            {boards.map((b) => (
-              <option key={b.boardKey} value={b.boardKey}>
-                {b.title}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <div className="font-semibold text-base shrink-0">{boardTitle}</div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setNewBoardOpen(true);
-              setNewBoardTitle("");
-              setNewBoardKey("");
-              setNewBoardDesc("");
-              setNewBoardError(null);
-            }}
-            className="text-xs px-2 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white"
-          >
-            New board
-          </button>
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <span className="text-xs text-slate-300 shrink-0">Board:</span>
 
-          {boardsError && (
-            <span className="text-[0.7rem] text-red-400">{boardsError}</span>
-          )}
-        </div>
+              <select
+                className="text-xs bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-slate-100 max-w-[180px] sm:max-w-none"
+                value={selectedBoardKey ?? ""}
+                onChange={(e) => setSelectedBoardKey(e.target.value || null)}
+                disabled={boardsLoading || boards.length === 0}
+              >
+                {boards.map((b) => (
+                  <option key={b.boardKey} value={b.boardKey}>
+                    {b.title}
+                  </option>
+                ))}
+              </select>
 
-        <div className="text-xs text-slate-300">
-          Zoom: {(scale * 100).toFixed(0)}%
-        </div>
-        {loading && (
-          <div className="text-slate-400 text-xs">Loading messages…</div>
-        )}
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBoardOpen(true);
+                  setNewBoardTitle("");
+                  setNewBoardKey("");
+                  setNewBoardDesc("");
+                  setNewBoardError(null);
+                }}
+                className="text-xs px-2 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white shrink-0"
+              >
+                New board
+              </button>
 
-        <div className="ml-auto text-xs text-slate-400">
-          Scroll to zoom • drag to pan • double-click to leave a note • click a
-          dot to open
+              {boardsError && (
+                <span className="text-[0.7rem] text-red-400">
+                  {boardsError}
+                </span>
+              )}
+            </div>
+
+            <div className="text-xs text-slate-300 shrink-0">
+              Zoom: {(scale * 100).toFixed(0)}%
+            </div>
+
+            {loading && (
+              <div className="text-slate-400 text-xs shrink-0">
+                Loading messages…
+              </div>
+            )}
+          </div>
+          <div className="hidden sm:block sm:ml-auto text-xs text-slate-400">
+            Scroll to zoom • drag to pan • double-click to leave a note • click
+            a dot to open
+          </div>
         </div>
       </div>
 
@@ -536,21 +650,22 @@ const CommunityCanvas: React.FC = () => {
         <div
           ref={containerRef}
           className="
-            relative
-            w-[min(1400px,96vw)]
-            h-[min(800px,82vh)]
-            rounded-[32px]
-            border-2 border-slate-600/70
-            bg-slate-950/80
-            shadow-[0_0_140px_rgba(15,23,42,1)]
-            overflow-hidden
-            cursor-grab active:cursor-grabbing
-          "
+    relative
+    w-[min(1400px,96vw)]
+    h-[min(800px,82vh)]
+    rounded-[32px]
+    border-2 border-slate-600/70
+    bg-slate-950/80
+    shadow-[0_0_140px_rgba(15,23,42,1)]
+    overflow-hidden
+    cursor-grab active:cursor-grabbing
+    touch-none
+  "
           onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           onDoubleClick={handleDoubleClick}
         >
           <div
@@ -575,7 +690,9 @@ const CommunityCanvas: React.FC = () => {
                   key={m.id}
                   className="absolute"
                   style={{ left: m.x, top: m.y, zIndex: isOpen ? 50 : 1 }}
-                  onMouseDown={(e) => e.stopPropagation()} // prevent panning when interacting with note
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  // prevent panning when interacting with note
                   onDoubleClick={(e) => e.stopPropagation()} // prevent creating note over existing
                 >
                   {/* anchor dot */}
